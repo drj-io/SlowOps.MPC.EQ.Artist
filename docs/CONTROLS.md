@@ -7,7 +7,8 @@ appended. Indices are the order the MPC sees (`plugin/build/params.json`).
 
 | Control | What it does |
 |---|---|
-| **DRAW** | Draw mode. The curve becomes your drawing, which starts from the EQ you hear, and the pen is live: drag on the graph to paint it. Columns your finger skips are filled in, and lifting for 0.15 s starts a new stroke. |
+| *the graph* | Drag on it to paint the curve. The first touch switches Draw on, and the drawing starts from the EQ you hear. Columns your finger skips are filled in, and lifting for 0.15 s starts a new stroke. |
+| **DRAW** | Shows your drawing (on) or the EQ you hear (off). Turning it on starts the drawing from the EQ you hear. |
 | **APPLY** | Fits the drawing to up to *Max Bands* real bands and switches them in (30 ms crossfade, no click). Draw turns off so you see and hear the result. The status at the top right shows the band count and how far the bands are from the drawing (RMS dB). |
 | **CLEAR** | Flattens the drawing. Apply after Clear removes all bands. |
 | **UNDO** | Back to the bands before the last Apply. Press again to redo. |

@@ -41,7 +41,7 @@ public:
     enum
     {
         kOutput,      // index 0: the MPC nudges it on every prepare, so it is harmless
-        kDraw,        // Draw mode: the pen paints the curve
+        kDraw,        // Draw mode: shows the drawing instead of the response; the pen switches it on
         kApply,       // trigger: fit the drawing to bands
         kClear,       // trigger: flatten the drawing
         kUndo,        // trigger: back to the bands before the last Apply (press again to redo)
@@ -210,7 +210,7 @@ private:
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 200;   // 0.2.0
+        info.version = 201;   // 0.2.1
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;
@@ -348,14 +348,20 @@ private:
     // ---- pen ----------------------------------------------------------------------------------
     // Each new X/Y pair paints the column under X with the gain at Y. Columns skipped since the
     // previous point of the same stroke are filled by straight-line interpolation. A pause longer
-    // than penGapSamples_ starts a new stroke. The pen only paints in Draw mode.
+    // than penGapSamples_ starts a new stroke. Touching the graph outside Draw mode switches Draw
+    // on first (the drawing then starts from the curve you hear).
     void handlePen(int n)
     {
         sincePen_ = std::min(sincePen_ + n, 1 << 30);
         const uint32_t seq = penSeq_.load(std::memory_order_relaxed);
         if (seq == lastPenSeq_) return;
         lastPenSeq_ = seq;
-        if (!getBool(kDraw)) return;
+        if (!getBool(kDraw))
+        {
+            setValue(kDraw, 1.0f);
+            handleDrawToggle();
+            sincePen_ = 1 << 30;   // this touch starts a new stroke
+        }
 
         const bool newStroke = sincePen_ > penGapSamples_;
         sincePen_ = 0;

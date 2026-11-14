@@ -3665,15 +3665,12 @@
                 "map": []
               },
               "bounds": {
-                "version": 2,
-                "acceptsHWFocus": "No",
+                "version": 1,
+                "acceptsHWFocus": "Yes",
                 "showWhenDataModelInvalid": "Show",
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
-                "bounds": "12 28 1256 472",
-                "additionalInvalidatingHandles": [
-                  "IndexedEnabling/1/2/Parameter 1"
-                ]
+                "bounds": "12 28 1256 472"
               }
             },
             {

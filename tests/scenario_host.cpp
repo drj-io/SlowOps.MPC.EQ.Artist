@@ -190,15 +190,18 @@ int main(int argc, char** argv)
         }
         CHECK(p.text(kFitInfo) == "Draw, then Apply", "fit status reads '%s'", p.text(kFitInfo).c_str());
 
-        std::printf("== the pen only paints in Draw mode\n");
-        p.set(kPenX, 0.5f); p.set(kPenY, 1.0f); p.block(0.0);
-        CHECK(std::fabs(p.drawDb(16)) < 0.01f, "the pen painted with Draw off");
+        std::printf("== touching the graph switches Draw on and paints\n");
+        p.set(kPenX, (16 + 0.5f) / kCols); p.set(kPenY, 1.0f); p.block(0.0);
+        CHECK(p.get(kDraw) > 0.5f, "a pen touch did not switch Draw on");
+        CHECK(std::fabs(p.drawDb(16) - 18.0f) < 0.2f, "the first touch painted %.2f dB, expected +18", p.drawDb(16));
+        CHECK(std::fabs(p.drawDb(15)) < 0.01f && std::fabs(p.drawDb(17)) < 0.01f, "the first touch painted its neighbours");
+        p.set(kClear, 1.0f); p.block(0.0);
+        p.set(kDraw, 0.0f); p.block(0.0);
 
         std::printf("== draw a curve, Apply, the audio follows the drawing\n");
         p.recording = true;
         p.run(2.0, -1.0);   // pink noise, flat
-        p.set(kDraw, 1.0f); p.block(0.0);
-        penDraw(p);
+        penDraw(p);   // the first touch switches Draw on
         double worstDraw = 0;
         for (int c = 0; c < kCols; ++c) worstDraw = std::fmax(worstDraw, std::fabs(p.drawDb(c) - drawnDb(colHz(c))));
         CHECK(worstDraw < 1.0, "the pen drawing is off the intended curve by %.2f dB", worstDraw);

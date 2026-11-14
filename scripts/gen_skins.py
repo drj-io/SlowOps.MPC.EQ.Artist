@@ -10,8 +10,9 @@ EQ tab (back to front):
   * the background (graph grid), then 32 spectrum bars (film strips bound to "Spec n");
   * the curve: 32 dots bound to "Resp n" (the EQ you hear) while Draw is off, or to "Draw n"
     (your drawing) while Draw is on;
-  * the pen: one transparent XYPad over the graph (Pen X / Pen Y), shown only in Draw mode. The
-    plugin paints the columns from it;
+  * the pen: one transparent XYPad over the graph (Pen X / Pen Y), always there (as in the
+    hardware spike, where it worked). The plugin paints the columns from it, and a touch outside
+    Draw mode switches Draw on;
   * DRAW / APPLY / CLEAR / UNDO: a text label under a translucent image button;
   * the fit status ("Fit"'s value text), and Output, Max Bands, Analyzer, Speed, Bypass.
 BANDS 1-4 / BANDS 5-8: one row per band: On, Type, Freq, Gain, Q, Slope.
@@ -77,9 +78,10 @@ def slider(name, handle, r):
     return entry(name, 'Slider', {'version': 1, 'handleName': handle}, r, 'Hide', 'Yes')
 
 
-def xypad(name, x_handle, y_handle, img, r, only=None):
+def xypad(name, x_handle, y_handle, img, r):
+    # Exactly the entry the hardware spike used (version 1 bounds, hardware focus on).
     return entry(name, 'XYPad', {'version': 1, 'xPositionHandle': x_handle, 'yPositionHandle': y_handle,
-                                 'image': img}, r, 'Show', 'No', only)
+                                 'image': img}, r, 'Show', 'Yes')
 
 
 def tab(name, key, children):
@@ -117,7 +119,7 @@ def eq_tab():
     # The pen. The puck stays inside its pad, so the pad overhangs the graph by half a puck on
     # every side: the puck's centre then reaches the graph's edges.
     h = L.PUCK / 2.0
-    out.append(xypad('pen', P('Pen X'), P('Pen Y'), 'puck.png', (gx - h, gy - h, gw + 2 * h, gh + 2 * h), draw_on))
+    out.append(xypad('pen', P('Pen X'), P('Pen Y'), 'puck.png', (gx - h, gy - h, gw + 2 * h, gh + 2 * h)))
 
     # Buttons: the label first, the translucent button over it (the button takes the touch).
     for pname, caption, x in L.BUTTONS:

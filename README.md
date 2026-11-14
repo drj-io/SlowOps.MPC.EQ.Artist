@@ -8,7 +8,7 @@ An EQ for the Akai MPC standalone (MPC OS 3.10.1+, insert effect) that you draw:
    instead of narrowing towards 20 kHz.
 3. Fine-tune each band's Freq / Gain / Q / Type / Slope on its own page or with the Q-Links.
 
-**Status: 0.2.0, first working version.** Draw, Apply, Undo, the 8 bands and the live spectrum all work.
+**Status: 0.2.1, first working version.** Draw, Apply, Undo, the 8 bands and the live spectrum all work.
 It has been tested in the desktop simulator, not yet on the hardware. Controls: [docs/CONTROLS.md](docs/CONTROLS.md).
 How the drawing surface was chosen (the pen won): [docs/SPIKE.md](docs/SPIKE.md).
 
