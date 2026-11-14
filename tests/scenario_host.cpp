@@ -1,10 +1,11 @@
 // scenario_host.cpp - drives the real native plugin build through the VST2 ABI (as the MPC does):
-// draws a curve with the pen, taps Apply, waits for the fit, and checks that the audio follows
-// the drawing. Also Undo / Redo, Bypass, Clear, the response and spectrum displays, and clicks.
+// draws a curve with the pen and checks that the audio follows the drawing on its own (no Apply).
+// Also Undo / Redo of a stroke, Clear, Bypass, hand edits redrawing the curve, the response and
+// spectrum displays, and clicks.
 //
 // Build: c++ -std=c++17 -O2 -I third_party/mpc-plugin-builder-sdk/framework tests/scenario_host.cpp -o build/scenario_host
 // Run:   build/scenario_host plugin/build/native/eq-artist.dylib [out_dir]
-//        (out_dir gets apply-demo.wav: pink noise, flat for 2 s, then with the drawn EQ applied)
+//        (out_dir gets draw-demo.wav: pink noise, flat for 2 s, then with the drawn EQ)
 
 #include "mpc_vst2_abi.h"
 
@@ -23,7 +24,7 @@ static int g_fail = 0, g_pass = 0;
 #define CHECK(cond, ...) do { if (cond) { ++g_pass; } else { ++g_fail; std::printf("  FAIL %s:%d: ", __FILE__, __LINE__); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
 
 // Parameter indices (plugin/src/EqArtist.cpp).
-enum P { kOutput, kDraw, kApply, kClear, kUndo, kMaxBands, kAnalyzer, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
+enum P { kOutput, kClear, kUndo, kMaxBands, kAnalyzer, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
          kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kNum = kResp0 + 32 };
 static constexpr int kCols = 32;
 static int bandOn(int b) { return kBand0 + b * 6; }
@@ -129,17 +130,12 @@ struct Plug
         return 20.0 * std::log10(peak / 0.25);
     }
 
-    // Wait (in real time: the fit runs on its own thread) until Apply has finished.
-    bool waitForFit(double seconds = 3.0)
+    // Let the fitter (its own thread) catch up: keep processing in real time for a while.
+    void settle(double seconds = 1.0, double hz = 0.0)
     {
-        for (int k = 0; k < (int)(seconds * 200); ++k)
-        {
-            block(0.0);
-            if (text(kFitInfo) != "Fitting...") return true;
-            usleep(5000);
-        }
-        return false;
+        for (int k = 0; k < (int)(seconds * 200); ++k) { block(hz); usleep(5000); }
     }
+    int bandsOn() { int on = 0; for (int b = 0; b < 8; ++b) on += get(bandOn(b)) > 0.5f; return on; }
 };
 
 static void writeWav(const std::string& path, const std::vector<float>& l, const std::vector<float>& r)
@@ -188,38 +184,44 @@ int main(int argc, char** argv)
             const double g = p.gainDb(hz);
             CHECK(std::fabs(g) < 0.05, "%.0f Hz: %.2f dB with no bands", hz, g);
         }
-        CHECK(p.text(kFitInfo) == "Draw, then Apply", "fit status reads '%s'", p.text(kFitInfo).c_str());
+        CHECK(p.text(kFitInfo) == "Draw on the graph", "fit status reads '%s'", p.text(kFitInfo).c_str());
 
-        std::printf("== touching the graph switches Draw on and paints\n");
-        p.set(kPenX, (16 + 0.5f) / kCols); p.set(kPenY, 1.0f); p.block(0.0);
-        CHECK(p.get(kDraw) > 0.5f, "a pen touch did not switch Draw on");
-        CHECK(std::fabs(p.drawDb(16) - 18.0f) < 0.2f, "the first touch painted %.2f dB, expected +18", p.drawDb(16));
-        CHECK(std::fabs(p.drawDb(15)) < 0.01f && std::fabs(p.drawDb(17)) < 0.01f, "the first touch painted its neighbours");
+        std::printf("== the sound follows the drawing while you draw (no Apply)\n");
+        // Draw the left half, then hold still: the bump at 200 Hz is already in the sound.
+        for (int c = 0; c < 16; ++c)
+        {
+            p.set(kPenX, (c + 0.5f) / kCols);
+            p.set(kPenY, (float)((drawnDb(colHz(c)) / 18.0 + 1.0) / 2.0));
+            p.block(0.0);
+            usleep(2000);
+        }
+        p.settle(0.3);
+        CHECK(p.bandsOn() >= 1, "no bands while drawing");
+        CHECK(std::fabs(p.gainDb(200.0) - drawnDb(200.0)) < 1.5, "mid-drawing: %.2f dB at 200 Hz, drew %.2f",
+              p.gainDb(200.0), drawnDb(200.0));
         p.set(kClear, 1.0f); p.block(0.0);
-        p.set(kDraw, 0.0f); p.block(0.0);
+        p.settle(0.5);
+        CHECK(p.bandsOn() == 0, "Clear left %d bands on", p.bandsOn());
+        CHECK(std::fabs(p.gainDb(200.0)) < 0.1, "Clear is not flat");
+        CHECK(p.text(kFitInfo) == "Flat", "fit status after Clear reads '%s'", p.text(kFitInfo).c_str());
 
-        std::printf("== draw a curve, Apply, the audio follows the drawing\n");
+        std::printf("== one stroke across the graph: the audio matches the drawing\n");
         p.recording = true;
         p.run(2.0, -1.0);   // pink noise, flat
-        penDraw(p);   // the first touch switches Draw on
+        p.run(0.3);         // a pause: the next touch is a new stroke
+        penDraw(p);
+        p.settle(1.0, -1.0);
+        p.run(2.0, -1.0);   // pink noise, EQ'd
+        p.recording = false;
         double worstDraw = 0;
         for (int c = 0; c < kCols; ++c) worstDraw = std::fmax(worstDraw, std::fabs(p.drawDb(c) - drawnDb(colHz(c))));
         CHECK(worstDraw < 1.0, "the pen drawing is off the intended curve by %.2f dB", worstDraw);
-        p.set(kApply, 1.0f);
-        p.block(-1.0);
-        CHECK(p.waitForFit(), "the fit did not finish within 3 s");
-        p.run(2.0, -1.0);   // pink noise, EQ'd
-        p.recording = false;
-        CHECK(p.get(kDraw) < 0.5f, "Draw is still on after Apply");
-        CHECK(p.get(kApply) < 0.5f, "Apply did not reset itself");
-        int on = 0;
-        for (int b = 0; b < 8; ++b) on += p.get(bandOn(b)) > 0.5f;
-        std::printf("  fit: %s, %d bands on\n", p.text(kFitInfo).c_str(), on);
-        CHECK(on >= 2 && on <= 8, "%d bands on", on);
+        std::printf("  fit: %s\n", p.text(kFitInfo).c_str());
         for (int b = 0; b < 8; ++b)
             if (p.get(bandOn(b)) > 0.5f)
                 std::printf("    B%d %-10s %-10s %-9s Q %s\n", b + 1, p.text(kBand0 + b * 6 + 1).c_str(), p.text(kBand0 + b * 6 + 2).c_str(),
                             p.text(kBand0 + b * 6 + 3).c_str(), p.text(kBand0 + b * 6 + 4).c_str());
+        CHECK(p.bandsOn() >= 2, "%d bands on", p.bandsOn());
         double worst = 0, worstHz = 0;
         for (int c : {4, 8, 11, 13, 15, 18, 20, 22, 24, 26, 30})
         {
@@ -231,11 +233,9 @@ int main(int argc, char** argv)
         double worstResp = 0;
         for (int c = 0; c < kCols; ++c) worstResp = std::fmax(worstResp, std::fabs(p.respDb(c) - drawnDb(colHz(c))));
         CHECK(worstResp < 1.6, "the response display misses the drawing by %.2f dB", worstResp);
-        if (!outDir.empty()) writeWav(outDir + "/apply-demo.wav", p.recL, p.recR);
+        if (!outDir.empty()) writeWav(outDir + "/draw-demo.wav", p.recL, p.recR);
 
-        std::printf("== no click when Apply switches the EQ in\n");
-        // A steady 1 kHz sine; Undo swaps the whole EQ out and back in. The biggest step between
-        // samples during the swaps must stay near the sine's own largest step.
+        std::printf("== no click when Undo / Redo swap the EQ\n");
         p.run(0.3, 1000.0);
         p.maxStep = 0; p.run(0.3, 1000.0);
         const float steady = p.maxStep;
@@ -245,33 +245,37 @@ int main(int argc, char** argv)
         const double ceiling = steady * std::pow(10.0, std::fabs(drawnDb(1000.0)) / 20.0) * 1.3;
         CHECK(p.maxStep < ceiling, "step %.4f during Undo/Redo, steady-state step %.4f", p.maxStep, steady);
 
-        std::printf("== Undo goes back to flat, Undo again brings the EQ back\n");
+        std::printf("== Undo takes back the stroke (drawing and sound); Undo again redoes it\n");
         p.set(kUndo, 1.0f); p.block(0.0);
-        on = 0;
-        for (int b = 0; b < 8; ++b) on += p.get(bandOn(b)) > 0.5f;
-        CHECK(on == 0, "%d bands still on after Undo", on);
+        p.settle(0.3);
+        CHECK(p.bandsOn() == 0, "%d bands on after undoing the stroke", p.bandsOn());
         CHECK(std::fabs(p.gainDb(200.0)) < 0.1, "not flat after Undo");
+        CHECK(std::fabs(p.drawDb(10)) < 0.01f, "the drawing was not undone");
         p.set(kUndo, 1.0f); p.block(0.0);
+        p.settle(0.3);
         CHECK(std::fabs(p.gainDb(200.0) - drawnDb(200.0)) < 1.5, "Redo did not bring the bump back");
+        CHECK(std::fabs(p.drawDb(10) - drawnDb(colHz(10))) < 1.0, "Redo did not bring the drawing back");
 
-        std::printf("== Bypass\n");
+        std::printf("== Bypass, and the status line says so\n");
         p.set(kBypass, 1.0f);
         CHECK(std::fabs(p.gainDb(200.0)) < 0.05, "bypassed but %.2f dB at 200 Hz", p.gainDb(200.0));
+        CHECK(p.text(kFitInfo) == "BYPASSED", "status reads '%s' while bypassed", p.text(kFitInfo).c_str());
         p.set(kBypass, 0.0f);
+        p.block(0.0);
 
-        std::printf("== Draw starts from the curve you hear; Clear flattens the drawing\n");
-        p.set(kDraw, 1.0f); p.block(0.0);
-        double worstStart = 0;
-        for (int c = 0; c < kCols; ++c) worstStart = std::fmax(worstStart, std::fabs(p.drawDb(c) - p.respDb(c)));
-        CHECK(worstStart < 1.0, "Draw started %.2f dB away from the response", worstStart);
-        p.set(kClear, 1.0f); p.block(0.0);
-        bool flat = true;
-        for (int c = 0; c < kCols; ++c) flat = flat && std::fabs(p.drawDb(c)) < 0.01f;
-        CHECK(flat, "Clear left the drawing bent");
-        p.set(kApply, 1.0f); p.block(0.0);
-        CHECK(p.waitForFit(), "the second fit did not finish");
-        CHECK(std::fabs(p.gainDb(200.0)) < 0.1, "applying a flat drawing is not flat");
-        CHECK(p.text(kFitInfo) == "Flat: no bands", "fit status reads '%s'", p.text(kFitInfo).c_str());
+        std::printf("== turning a band knob redraws the drawing from the EQ you hear\n");
+        int bell = -1;
+        for (int b = 0; b < 8 && bell < 0; ++b) if (p.get(bandOn(b)) > 0.5f && p.text(kBand0 + b * 6 + 1) == "Bell") bell = b;
+        CHECK(bell >= 0, "no bell band to edit");
+        if (bell >= 0)
+        {
+            p.set(kBand0 + bell * 6 + 3, (0.0f + 24.0f) / 48.0f);   // gain to 0 dB
+            p.settle(0.6);
+            double worstSync = 0;
+            for (int c = 0; c < kCols; ++c) worstSync = std::fmax(worstSync, std::fabs(p.drawDb(c) - p.respDb(c)));
+            CHECK(worstSync < 1.0, "the drawing is %.2f dB away from the EQ after a knob edit", worstSync);
+            CHECK(p.bandsOn() >= 1, "the knob edit was overwritten by a refit");
+        }
 
         std::printf("== the spectrum display follows the input\n");
         p.run(0.5, 1000.0);

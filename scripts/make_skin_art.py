@@ -8,7 +8,10 @@ palette in skin_layout.py changes.
   spec_bar.png  38 x (432 x 36)  spectrum column film strip: frame k = bar k/35 of the graph tall
   dot.png       38 x (432 x 37)  curve film strip (drawing and response): frame k = a dot at -18 + k dB
   puck.png      40 x 40      pen XYPad puck (a ring)
-  btn_on.png / btn_off.png   170 x 38  translucent button faces (the label sits beneath them)
+  draw_dot.png  38 x (432 x 37)  the drawing: a smaller, dimmer dot (frame k = -18 + k dB)
+
+Text (button labels, graph axis labels on bg.png) comes from make_text_art.py (needs Pillow),
+which must run after this script.
 
 Film strips stack frames top to bottom and stay under 16384 px tall.
 """
@@ -133,29 +136,14 @@ def puck():
     c.save('puck.png')
 
 
-def rounded_rect(c, w, h, radius, fill, fill_a, edge, edge_a, width=2.0):
-    for y in range(h):
-        for x in range(w):
-            # Distance outside a rounded rectangle (negative inside).
-            qx = max(abs(x + 0.5 - w / 2) - (w / 2 - radius), 0)
-            qy = max(abs(y + 0.5 - h / 2) - (h / 2 - radius), 0)
-            d = math.hypot(qx, qy) - radius
-            inside = min(1.0, max(0.0, 0.5 - d))
-            if inside <= 0:
-                continue
-            c.blend(x, y, fill, fill_a * inside)
-            ring = min(1.0, max(0.0, width - abs(d + width / 2) + 0.5))
-            c.blend(x, y, edge, edge_a * ring * inside)
-
-
-def buttons():
-    w, h = L.BUTTON_W, L.BUTTON_H
-    off = Canvas(w, h)
-    rounded_rect(off, w, h, 8, L.PANEL, 0.25, L.GRID_HI, 1.0)
-    off.save('btn_off.png')
-    on = Canvas(w, h)
-    rounded_rect(on, w, h, 8, L.GLOW, 0.35, L.CURVE, 1.0, 2.5)
-    on.save('btn_on.png')
+def draw_dot():
+    w, h, n = L.COL_W, L.GRAPH[3], L.DOT_FRAMES
+    c = Canvas(w, h * n)
+    gy = L.GRAPH[1]
+    for k in range(n):
+        db = -L.DRAW_RANGE_DB + k * (2 * L.DRAW_RANGE_DB / (n - 1))
+        c.ring(w / 2, k * h + L.db_y(db) - gy, 5.0, 1.6, L.DRAWN, 0.9)
+    c.save('draw_dot.png')
 
 
 def main():
@@ -165,7 +153,7 @@ def main():
     spec_bar()
     dot()
     puck()
-    buttons()
+    draw_dot()
 
 
 if __name__ == '__main__':

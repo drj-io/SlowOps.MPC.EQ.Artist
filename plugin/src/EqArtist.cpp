@@ -1,12 +1,14 @@
-// Slow Ops EQ Artist: draw an EQ curve over a live spectrum, then Apply it as real bands.
+// Slow Ops EQ Artist: draw an EQ curve over a live spectrum; the sound follows as you draw.
 //
 // This file is the thin adapter between the MPC Plugin Builder SDK and the DSP in
 // core/include/slowops/eqartist/ (standard library only, no SDK dependency). It:
 //   * declares the parameters (ids are permanent once released; see docs/CONTROLS.md),
 //   * paints the 32 Draw columns from the pen (an XYPad over the graph, bound to Pen X / Pen Y),
-//   * turns the self-resetting Apply / Clear / Undo buttons into actions,
-//   * sends the drawing to the curve fitter (on its own thread) and writes the fitted bands
-//     into the band parameters, so knobs, Q-Links, automation and the project all see them,
+//   * keeps fitting the drawing to bands while it changes (on the fitter's own thread) and writes
+//     each result into the band parameters, so knobs, Q-Links, automation and the project all
+//     see them,
+//   * keeps the drawing in step when a band is edited by hand (knob, Q-Link, automation),
+//   * turns the self-resetting Clear / Undo buttons into actions (Undo = the last stroke),
 //   * runs the EQ engine, and writes the spectrum and the EQ's response curve into read-only
 //     parameters about 30 times a second.
 
@@ -35,17 +37,15 @@ public:
     static constexpr float kDrawRangeDb = 18.0f;
     static constexpr float kSpecTopDb = -6.0f, kSpecBottomDb = -66.0f;
     static constexpr int kSpecFrames = 36;    // must match spec_bar.png (scripts/skin_layout.py)
-    static constexpr int kDotFrames = 37;     // must match dot.png: -18..+18 dB in 1 dB steps
+    static constexpr int kDotFrames = 37;     // must match dot.png / draw_dot.png: -18..+18 dB in 1 dB steps
 
-    // Parameter indices. The ids are permanent once released: only ever append.
+    // Parameter indices. The ids are permanent once released (1.0): from then on, only append.
     enum
     {
         kOutput,      // index 0: the MPC nudges it on every prepare, so it is harmless
-        kDraw,        // Draw mode: shows the drawing instead of the response; the pen switches it on
-        kApply,       // trigger: fit the drawing to bands
-        kClear,       // trigger: flatten the drawing
-        kUndo,        // trigger: back to the bands before the last Apply (press again to redo)
-        kMaxBands,    // 1..8: how many bands Apply may use
+        kClear,       // trigger: flat drawing, no bands
+        kUndo,        // trigger: undo the last stroke or Clear (press again to redo)
+        kMaxBands,    // 1..8: how many bands the fit may use
         kAnalyzer,    // Off / Pre / Post
         kSpeed,       // analyser fall: Slow / Medium / Fast
         kBypass,
@@ -60,12 +60,11 @@ public:
     };
     enum { kOn, kType, kFreq, kGain, kQ, kSlope };
     static int bandParam(int band, int field) { return kBand0 + band * kPerBand + field; }
+    static constexpr int kNumBandParams = kBands * kPerBand;
 
     EqArtist() : mpc::Plugin(makeInfo())
     {
         addParam(mpc::floatParam("output", "Output", -24.0f, 12.0f, 0.0f, "dB", 1));
-        addParam(mpc::boolParam("draw", "Draw", false));
-        addParam(mpc::boolParam("apply", "Apply", false));
         addParam(mpc::boolParam("clear", "Clear", false));
         addParam(mpc::boolParam("undo", "Undo", false));
         addParam(mpc::intParam("maxbands", "Max Bands", 1, kBands, kBands));
@@ -115,19 +114,22 @@ public:
         pullBands();
         engine_.prepare(sampleRate);
         penGapSamples_ = (int)(0.15 * sampleRate);
+        syncDelaySamples_ = (int)(0.3 * sampleRate);
         displayEvery_ = (int)(sampleRate / 30.0);
         respDirty_ = true;
     }
 
-    // Also called after a state load. Restoring Pen X / Pen Y from a project must not count as a
-    // pen stroke, and the triggers must not fire.
+    // Also called after a state load. Restoring Pen X / Pen Y or the bands from a project must
+    // not count as a pen stroke or a hand edit, and the triggers must not fire.
     void reset() override
     {
-        for (int t : {kApply, kClear, kUndo}) if (getBool(t)) setNormalised(t, 0.0f);
+        for (int t : {kClear, kUndo}) if (getBool(t)) setNormalised(t, 0.0f);
         lastPenSeq_ = penSeq_.load(std::memory_order_relaxed);
         lastCol_ = -1;
         sincePen_ = 1 << 30;
-        wasDraw_ = getBool(kDraw);
+        drawDirty_ = false;
+        selfBandWrite_ = true;   // the next pullBands() takes the loaded bands as they are
+        handEdited_ = false;
         engine_.reset();
         respDirty_ = true;
     }
@@ -147,11 +149,12 @@ public:
         float* outR = ctx.numOutputs > 1 ? ctx.outputs[1] : ctx.outputs[0];
         if (!inL) { for (int i = 0; i < n; ++i) outL[i] = outR[i] = 0.0f; return; }
 
-        handleDrawToggle();
         handleTriggers();
         handlePen(n);
         handleFitResult();
+        requestFitIfNeeded();
         pullBands();
+        syncDrawingToHandEdits(n);
 
         const int analyzer = getInt(kAnalyzer);
         if (analyzer == 1) for (int i = 0; i < n; ++i) spectrum_.push(0.5f * (inL[i] + inR[i]));
@@ -174,14 +177,13 @@ public:
         char buf[64];
         if (index == kFitInfo)
         {
-            const int st = fitState_.load();
-            if (st == kFitBusy) out = "Fitting...";
-            else if (st == kFitNone) out = "Draw, then Apply";
+            if (getBool(kBypass)) { out = "BYPASSED"; return true; }
+            const int nb = fitBands_.load();
+            if (nb < 0) out = "Draw on the graph";
+            else if (nb == 0) out = "Flat";
             else
             {
-                const int nb = fitBands_.load();
-                if (nb == 0) std::snprintf(buf, sizeof(buf), "Flat: no bands");
-                else std::snprintf(buf, sizeof(buf), "%d band%s, %.1f dB off", nb, nb == 1 ? "" : "s", (double)fitRms_.load());
+                std::snprintf(buf, sizeof(buf), "%d band%s, %.1f dB off", nb, nb == 1 ? "" : "s", (double)fitRms_.load());
                 out = buf;
             }
             return true;
@@ -202,15 +204,13 @@ public:
     }
 
 private:
-    enum { kFitNone, kFitBusy, kFitDone };
-
     static mpc::PluginInfo makeInfo()
     {
         mpc::PluginInfo info;
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 201;   // 0.2.1
+        info.version = 300;   // 0.3.0
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;
@@ -246,13 +246,22 @@ private:
         return p;
     }
 
+    // Engine targets from the band parameters. A change the plugin did not make itself is a hand
+    // edit (knob, Q-Link, automation): the drawing follows it once the edit has settled.
     void pullBands()
     {
+        bool changed = false;
         for (int b = 0; b < kBands; ++b)
         {
             const eq::BandParams p = readBand(b);
-            if (!(p == engine_.band(b))) { engine_.setBand(b, p); respDirty_ = true; }
+            if (!(p == engine_.band(b))) { engine_.setBand(b, p); changed = true; }
         }
+        if (changed)
+        {
+            respDirty_ = true;
+            if (!selfBandWrite_) { handEdited_ = true; sinceHandEdit_ = 0; }
+        }
+        selfBandWrite_ = false;
     }
 
     void writeBand(int b, const eq::BandParams& p)
@@ -266,19 +275,38 @@ private:
         setPlain(bandParam(b, kSlope), (float)p.slope);
     }
 
-    // ---- Draw / Apply / Clear / Undo -------------------------------------------------------------
-    // Turning Draw on starts the drawing from the curve you hear, so a redraw edits it.
-    void handleDrawToggle()
+    // ---- Undo: one snapshot of the drawing and the bands, taken before each stroke or Clear --------
+    void saveUndo()
     {
-        const bool d = getBool(kDraw);
-        if (d && !wasDraw_)
+        for (int i = 0; i < kNumBandParams; ++i) undoBands_[(std::size_t)i] = getNormalised(kBand0 + i);
+        for (int c = 0; c < kCols; ++c) undoDraw_[(std::size_t)c] = getNormalised(kDraw0 + c);
+        undoFit_ = {fitBands_.load(), fitRms_.load()};
+        hasUndo_ = true;
+    }
+
+    void swapUndo()
+    {
+        for (int i = 0; i < kNumBandParams; ++i)
         {
-            double db[kCols];
-            engine_.responseDb(colHz_.data(), db, kCols);
-            for (int c = 0; c < kCols; ++c) paint(c, (float)db[c]);
-            lastCol_ = -1;
+            const float cur = getNormalised(kBand0 + i);
+            setValue(kBand0 + i, undoBands_[(std::size_t)i]);
+            undoBands_[(std::size_t)i] = cur;
         }
-        wasDraw_ = d;
+        for (int c = 0; c < kCols; ++c)
+        {
+            const float cur = getNormalised(kDraw0 + c);
+            setValue(kDraw0 + c, undoDraw_[(std::size_t)c]);
+            undoDraw_[(std::size_t)c] = cur;
+        }
+        const std::pair<int, float> fit = {fitBands_.load(), fitRms_.load()};
+        fitBands_.store(undoFit_.first);
+        fitRms_.store(undoFit_.second);
+        undoFit_ = fit;
+        selfBandWrite_ = true;
+        drawDirty_ = false;
+        discardFit_ = fit_.busy();   // a fit still running belongs to the undone drawing
+        engine_.forceCrossfade();
+        bumpFitInfo();
     }
 
     void handleTriggers()
@@ -286,55 +314,65 @@ private:
         if (getBool(kClear))
         {
             setValue(kClear, 0.0f);
+            saveUndo();
             for (int c = 0; c < kCols; ++c) paint(c, 0.0f);
-        }
-        if (getBool(kApply))
-        {
-            setValue(kApply, 0.0f);
-            double db[kCols];
-            for (int c = 0; c < kCols; ++c) db[c] = get(kDraw0 + c);
-            if (fit_.request(colHz_.data(), db, kCols, getInt(kMaxBands)))
-            {
-                fitState_.store(kFitBusy);
-                bumpFitInfo();
-            }
+            drawDirty_ = true;
         }
         if (getBool(kUndo))
         {
             setValue(kUndo, 0.0f);
-            if (hasUndo_)
-            {
-                // Swap the current bands with the saved ones, so Undo again is Redo.
-                for (int i = 0; i < kBands * kPerBand; ++i)
-                {
-                    const float cur = getNormalised(kBand0 + i);
-                    setValue(kBand0 + i, undo_[(std::size_t)i]);
-                    undo_[(std::size_t)i] = cur;
-                }
-                engine_.forceCrossfade();
-            }
+            if (hasUndo_) swapUndo();
         }
+        // Bypass shows in the status line.
+        const bool byp = getBool(kBypass);
+        if (byp != lastBypass_) { lastBypass_ = byp; bumpFitInfo(); }
+    }
+
+    // ---- the fit: rerun whenever the drawing has changed and the fitter is free --------------
+    void requestFitIfNeeded()
+    {
+        if (!drawDirty_ || fit_.busy()) return;
+        double db[kCols];
+        for (int c = 0; c < kCols; ++c) db[c] = get(kDraw0 + c);
+        if (fit_.request(colHz_.data(), db, kCols, getInt(kMaxBands))) drawDirty_ = false;
     }
 
     void handleFitResult()
     {
         eq::FitResult r;
         if (!fit_.take(r)) return;
-        for (int i = 0; i < kBands * kPerBand; ++i) undo_[(std::size_t)i] = getNormalised(kBand0 + i);
-        hasUndo_ = true;
+        if (discardFit_) { discardFit_ = false; return; }
         for (int b = 0; b < kBands; ++b)
         {
             eq::BandParams p = b < r.count ? r.bands[(std::size_t)b] : eq::BandParams{};
             if (b >= r.count) p.on = false;
             writeBand(b, p);
         }
+        selfBandWrite_ = true;
+        handEdited_ = false;
+        // Each fit may number the bands differently, so switch the whole set over (30 ms) rather
+        // than letting band 1 glide from one frequency to another.
         engine_.forceCrossfade();
         fitBands_.store(r.count);
         fitRms_.store((float)r.rmsDb);
-        fitState_.store(kFitDone);
         bumpFitInfo();
-        setValue(kDraw, 0.0f);   // show the result
-        wasDraw_ = false;
+    }
+
+    // After a hand edit has been still for syncDelaySamples_, redraw the drawing from the EQ you
+    // hear, so the next stroke edits that curve instead of snapping back to the old drawing.
+    void syncDrawingToHandEdits(int n)
+    {
+        sinceHandEdit_ = std::min(sinceHandEdit_ + n, 1 << 30);
+        if (!handEdited_ || sinceHandEdit_ < syncDelaySamples_ || drawDirty_ || fit_.busy()) return;
+        handEdited_ = false;
+        double db[kCols];
+        engine_.responseDb(colHz_.data(), db, kCols);
+        for (int c = 0; c < kCols; ++c) paint(c, (float)db[c]);
+        int on = 0;
+        for (int b = 0; b < kBands; ++b) on += getBool(bandParam(b, kOn)) ? 1 : 0;
+        fitBands_.store(on);
+        fitRms_.store(0.0f);
+        bumpFitInfo();
     }
 
     // The fit status is the value text of a counter parameter: changing the value makes the MPC
@@ -348,27 +386,21 @@ private:
     // ---- pen ----------------------------------------------------------------------------------
     // Each new X/Y pair paints the column under X with the gain at Y. Columns skipped since the
     // previous point of the same stroke are filled by straight-line interpolation. A pause longer
-    // than penGapSamples_ starts a new stroke. Touching the graph outside Draw mode switches Draw
-    // on first (the drawing then starts from the curve you hear).
+    // than penGapSamples_ starts a new stroke; each stroke can be undone.
     void handlePen(int n)
     {
         sincePen_ = std::min(sincePen_ + n, 1 << 30);
         const uint32_t seq = penSeq_.load(std::memory_order_relaxed);
         if (seq == lastPenSeq_) return;
         lastPenSeq_ = seq;
-        if (!getBool(kDraw))
-        {
-            setValue(kDraw, 1.0f);
-            handleDrawToggle();
-            sincePen_ = 1 << 30;   // this touch starts a new stroke
-        }
 
-        const bool newStroke = sincePen_ > penGapSamples_;
+        const bool newStroke = sincePen_ > penGapSamples_ || lastCol_ < 0;
         sincePen_ = 0;
+        if (newStroke) saveUndo();
         const float x = getNormalised(kPenX), y = getNormalised(kPenY);
         const int col = std::clamp((int)(x * kCols), 0, kCols - 1);
         const float db = (y * 2.0f - 1.0f) * kDrawRangeDb;
-        if (newStroke || lastCol_ < 0)
+        if (newStroke)
         {
             paint(col, db);
         }
@@ -382,6 +414,8 @@ private:
         }
         lastCol_ = col;
         lastDb_ = db;
+        drawDirty_ = true;
+        handEdited_ = false;   // the pen wins over a pending hand-edit sync
     }
 
     void paint(int col, float db) { setPlain(kDraw0 + col, std::clamp(db, -kDrawRangeDb, kDrawRangeDb)); }
@@ -421,16 +455,21 @@ private:
     eq::FitWorker fit_;
     std::array<double, kCols> colHz_{};
     int displayAge_ = 0, displayEvery_ = 1470;
-    bool respDirty_ = true, wasDraw_ = false;
+    bool respDirty_ = true, drawDirty_ = false, discardFit_ = false, lastBypass_ = false;
 
     std::atomic<uint32_t> penSeq_{0};
     uint32_t lastPenSeq_ = 0;
     int sincePen_ = 1 << 30, penGapSamples_ = 6615, lastCol_ = -1;
     float lastDb_ = 0.0f;
 
-    std::array<float, kBands * kPerBand> undo_{};
+    bool selfBandWrite_ = true, handEdited_ = false;
+    int sinceHandEdit_ = 1 << 30, syncDelaySamples_ = 13230;
+
+    std::array<float, kNumBandParams> undoBands_{};
+    std::array<float, kCols> undoDraw_{};
+    std::pair<int, float> undoFit_{-1, 0.0f};
     bool hasUndo_ = false;
-    std::atomic<int> fitState_{kFitNone}, fitBands_{0};
+    std::atomic<int> fitBands_{-1};   // -1: nothing fitted yet
     std::atomic<float> fitRms_{0.0f};
     int fitCounter_ = 0;
 };

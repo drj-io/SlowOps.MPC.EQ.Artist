@@ -8,13 +8,13 @@ the PNGs from make_skin_art.py.
 
 EQ tab (back to front):
   * the background (graph grid), then 32 spectrum bars (film strips bound to "Spec n");
-  * the curve: 32 dots bound to "Resp n" (the EQ you hear) while Draw is off, or to "Draw n"
-    (your drawing) while Draw is on;
-  * the pen: one transparent XYPad over the graph (Pen X / Pen Y), always there (as in the
-    hardware spike, where it worked). The plugin paints the columns from it, and a touch outside
-    Draw mode switches Draw on;
-  * DRAW / APPLY / CLEAR / UNDO: a text label under a translucent image button;
-  * the fit status ("Fit"'s value text), and Output, Max Bands, Analyzer, Speed, Bypass.
+  * the EQ you hear: 32 bright dots bound to "Resp n";
+  * your drawing: 32 small rings bound to "Draw n", over the dots (a dot inside a ring = the EQ
+    is where you drew it);
+  * the pen: one transparent XYPad over the graph (Pen X / Pen Y), exactly as in the hardware
+    spike. The plugin paints the columns from it and refits the bands as you draw;
+  * CLEAR / UNDO / BYPASS: image buttons with the label drawn in (make_text_art.py);
+  * the fit status ("Fit"'s value text), and Output, Max Bands, Analyzer, Speed.
 BANDS 1-4 / BANDS 5-8: one row per band: On, Type, Freq, Gain, Q, Slope.
 """
 import json
@@ -48,19 +48,14 @@ def entry(name, typ, data, r, show='Show', focus='No', only=None):
             'handle remapping': {'version': 1, 'map': []}, 'bounds': b}
 
 
-def filmstrip(name, img, frames, handle, r, only=None):
+def filmstrip(name, img, frames, handle, r):
     return entry(name, 'Image', {'version': 2, 'imageType': 'FilmStrip', 'colour': '0', 'image': img,
-                                 'numFrames': frames, 'handleName': handle}, r, only=only)
+                                 'numFrames': frames, 'handleName': handle}, r)
 
 
 def text_style(size, colour, just):
     return {'version': 1, 'font': {'version': 1, 'name': 'Nexa', 'style': 'Bold', 'height': float(size)},
             'colour': L.argb(colour), 'justification': just, 'case': 'Original'}
-
-
-def text(name, s, r, size=16, colour=L.TEXT_DIM, just='horizontallyCentred verticallyCentred'):
-    return entry(name, 'Label', {'version': 1, 'textStyle': text_style(size, colour, just), 'type': 'Text',
-                                 'handleName': 'Invalid', 'text': s}, r)
 
 
 def value(name, handle, r, size=22, colour=L.TEXT, just='right verticallyCentred'):
@@ -69,7 +64,7 @@ def value(name, handle, r, size=22, colour=L.TEXT, just='right verticallyCentred
 
 
 def button(name, handle, r):
-    return entry(name, 'Button', {'version': 2, 'onImage': 'btn_on.png', 'offImage': 'btn_off.png',
+    return entry(name, 'Button', {'version': 2, 'onImage': name + '_on.png', 'offImage': name + '_off.png',
                                   'buttonId': 1, 'numButtonsInGroup': 1, 'handleName': handle,
                                   'gestureBehaviour': 'Instant'}, r, 'Hide')
 
@@ -100,32 +95,23 @@ def col_rect(c):
 
 
 def eq_tab():
-    draw_on = 'IndexedEnabling/1/2/%s' % P('Draw')
-    draw_off = 'IndexedEnabling/0/2/%s' % P('Draw')
     out = []
     out += [filmstrip('spec %d' % (c + 1), 'spec_bar.png', L.SPEC_FRAMES, P('Spec %d' % (c + 1)), col_rect(c))
             for c in range(L.NUM_COLS)]
-    out += [filmstrip('resp %d' % (c + 1), 'dot.png', L.DOT_FRAMES, P('Resp %d' % (c + 1)), col_rect(c), draw_off)
+    out += [filmstrip('resp %d' % (c + 1), 'dot.png', L.DOT_FRAMES, P('Resp %d' % (c + 1)), col_rect(c))
             for c in range(L.NUM_COLS)]
-    out += [filmstrip('draw %d' % (c + 1), 'dot.png', L.DOT_FRAMES, P('Draw %d' % (c + 1)), col_rect(c), draw_on)
+    out += [filmstrip('draw %d' % (c + 1), 'draw_dot.png', L.DOT_FRAMES, P('Draw %d' % (c + 1)), col_rect(c))
             for c in range(L.NUM_COLS)]
 
-    gx, gy, gw, gh = L.GRAPH
-    out += [text('f %s' % s, s, (L.freq_x(f) - 30, gy + gh - 26, 60, 22)) for f, s in L.FREQ_LABELS]
-    for db in (12, 0, -12):
-        out.append(text('db %d' % db, '%+d' % db if db else '0', (gx + 6, L.db_y(db) - 22, 50, 20), 15,
-                        just='left verticallyCentred'))
+    gx, gy, gw, gh = L.GRAPH   # the axis labels are drawn into bg.png (make_text_art.py)
 
     # The pen. The puck stays inside its pad, so the pad overhangs the graph by half a puck on
     # every side: the puck's centre then reaches the graph's edges.
     h = L.PUCK / 2.0
     out.append(xypad('pen', P('Pen X'), P('Pen Y'), 'puck.png', (gx - h, gy - h, gw + 2 * h, gh + 2 * h)))
 
-    # Buttons: the label first, the translucent button over it (the button takes the touch).
-    for pname, caption, x in L.BUTTONS:
-        r = (x, L.BUTTON_Y, L.BUTTON_W, L.BUTTON_H)
-        out.append(text('label ' + caption, caption, r, 20, L.TEXT))
-        out.append(button(caption.lower(), P(pname), r))
+    for (pname, caption), x in zip(L.BUTTONS, L.BUTTON_X):
+        out.append(button(caption.lower(), P(pname), (x, L.BUTTON_Y, L.BUTTON_W, L.BUTTON_H)))
     out.append(value('fit info', P('Fit'), L.FIT_INFO))
     out += [slider(n.lower(), P(n), (x, L.CONTROL_Y, L.CONTROL_W, L.CONTROL_H))
             for n, x in zip(L.CONTROLS, L.CONTROL_X)]
@@ -145,7 +131,7 @@ def bands_tab(first):
 def main():
     types = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt']
     slopes = ['6 dB', '12 dB', '18 dB', '24 dB', '36 dB', '48 dB']
-    reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Draw', 'Apply', 'Clear', 'Undo', 'Bypass')]
+    reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Clear', 'Undo', 'Bypass')]
     reps += [{'key': P('Analyzer'), 'value': ['Off', 'Pre', 'Post']},
              {'key': P('Speed'), 'value': ['Slow', 'Medium', 'Fast']},
              {'key': P('Max Bands'), 'value': [str(k) for k in range(1, 9)]}]

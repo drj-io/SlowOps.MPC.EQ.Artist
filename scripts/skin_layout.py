@@ -20,6 +20,8 @@ CURVE = (236, 222, 255)      # curve dots, button outlines
 GLOW = (190, 140, 255)       # glow around the curve
 TEXT = (204, 187, 221)
 TEXT_DIM = (150, 120, 180)
+DRAWN = (176, 150, 214)      # your drawing (small dim dots)
+WARN = (220, 60, 90)         # Bypass on
 
 
 def argb(rgb, a=255):
@@ -58,12 +60,13 @@ DB_LINES = [-12, -6, 0, 6, 12]
 # ---- EQ tab: buttons and status (top strip), controls (bottom row) ---------------------------
 BUTTON_W, BUTTON_H = 170, 38
 BUTTON_Y = 5
-BUTTONS = [('Draw', 'DRAW', 32), ('Apply', 'APPLY', 216), ('Clear', 'CLEAR', 400), ('Undo', 'UNDO', 584)]
-FIT_INFO = (780, 5, 468, 38)
+BUTTONS = [('Clear', 'CLEAR'), ('Undo', 'UNDO'), ('Bypass', 'BYPASS')]
+BUTTON_X = [32, 216, 400]
+FIT_INFO = (600, 5, 648, 38)
 CONTROL_Y, CONTROL_H = 498, 107
-CONTROLS = ['Output', 'Max Bands', 'Analyzer', 'Speed', 'Bypass']
-CONTROL_W = 230
-CONTROL_X = [32 + i * 246.5 for i in range(len(CONTROLS))]
+CONTROLS = ['Output', 'Max Bands', 'Analyzer', 'Speed']
+CONTROL_W = 260
+CONTROL_X = [32 + i * 318.67 for i in range(len(CONTROLS))]
 
 # ---- BANDS tabs: 4 bands x 6 controls -----------------------------------------------------------
 BAND_FIELDS = ['On', 'Type', 'Freq', 'Gain', 'Q', 'Slope']

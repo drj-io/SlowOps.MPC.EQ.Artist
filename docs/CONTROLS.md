@@ -1,22 +1,26 @@
 # Controls
 
-Parameter ids are permanent: saved projects find parameters by id, so new parameters are only ever
-appended. Indices are the order the MPC sees (`plugin/build/params.json`).
+Parameter ids become permanent at 1.0: saved projects find parameters by id, so from then on new
+parameters are only appended. Indices are the order the MPC sees (`plugin/build/params.json`).
 
 ## EQ tab
 
 | Control | What it does |
 |---|---|
-| *the graph* | Drag on it to paint the curve. The first touch switches Draw on, and the drawing starts from the EQ you hear. Columns your finger skips are filled in, and lifting for 0.15 s starts a new stroke. |
-| **DRAW** | Shows your drawing (on) or the EQ you hear (off). Turning it on starts the drawing from the EQ you hear. |
-| **APPLY** | Fits the drawing to up to *Max Bands* real bands and switches them in (30 ms crossfade, no click). Draw turns off so you see and hear the result. The status at the top right shows the band count and how far the bands are from the drawing (RMS dB). |
-| **CLEAR** | Flattens the drawing. Apply after Clear removes all bands. |
-| **UNDO** | Back to the bands before the last Apply. Press again to redo. |
+| *the graph* | Drag on it to draw. The sound follows as you draw: the drawing is refitted to up to *Max Bands* real bands whenever it changes, and each new set of bands is switched in with a 30 ms crossfade (no click). Columns your finger skips are filled in; lifting for 0.15 s ends the stroke. |
+| *bright dots* | The EQ you hear. |
+| *small rings* | Your drawing. A dot inside a ring means the EQ is where you drew it. |
+| *status, top right* | How many bands the fit used and how far they are from the drawing (RMS dB), or **BYPASSED**. |
+| **CLEAR** | Flat drawing, no bands. |
+| **UNDO** | Takes back the last stroke or Clear (drawing and sound together). Press again to redo. |
+| **BYPASS** | Lit when bypassed. Ramped (20 ms). |
 | **Output** | −24 … +12 dB. |
-| **Max Bands** | 1 … 8: the most bands Apply may use. Fewer bands give a simpler, broader EQ. |
+| **Max Bands** | 1 … 8: the most bands the fit may use. Fewer bands give a simpler, broader EQ. |
 | **Analyzer** | Off / Pre (input) / Post (output) spectrum behind the curve. |
 | **Speed** | How fast the spectrum falls: Slow 12, Medium 24, Fast 48 dB/s. |
-| **Bypass** | Ramped (20 ms). |
+
+Turning a band's knobs (BANDS pages, Q-Links, automation) changes the EQ directly. Once the knob has been
+still for 0.3 s, the drawing is redrawn from the EQ you hear, so the next stroke edits that curve.
 
 The graph runs from 20 Hz to 20 kHz (log scale) and ±18 dB. It shows 32 columns of about 1/3 octave each.
 The spectrum reads the total level in each column: a full-scale sine reads 0 dB, and pink noise reads flat.
@@ -51,15 +55,14 @@ Drawing, the triggers and the read-only displays are never on a knob.
 | Index | Id | Name | Automatable |
 |---|---|---|---|
 | 0 | `output` | Output | yes |
-| 1 | `draw` | Draw | yes |
-| 2–4 | `apply`, `clear`, `undo` | Apply, Clear, Undo (self-resetting) | yes |
-| 5 | `maxbands` | Max Bands | yes |
-| 6 | `analyzer` | Analyzer | yes |
-| 7 | `speed` | Speed | yes |
-| 8 | `bypass` | Bypass | yes |
-| 9–10 | `penx`, `peny` | Pen X / Pen Y (the pen pad) | no |
-| 11 | `fitinfo` | Fit (status text) | no |
-| 12–59 | `b{n}on`, `b{n}type`, `b{n}freq`, `b{n}gain`, `b{n}q`, `b{n}slope` | B*n* On … Slope, n = 1…8 | yes |
-| 60–91 | `draw1` … `draw32` | Draw 1 … 32 (the drawing, saved with the project) | no |
-| 92–123 | `spec1` … `spec32` | Spectrum display | no |
-| 124–155 | `resp1` … `resp32` | EQ response display | no |
+| 1–2 | `clear`, `undo` | Clear, Undo (self-resetting) | yes |
+| 3 | `maxbands` | Max Bands | yes |
+| 4 | `analyzer` | Analyzer | yes |
+| 5 | `speed` | Speed | yes |
+| 6 | `bypass` | Bypass | yes |
+| 7–8 | `penx`, `peny` | Pen X / Pen Y (the pen pad) | no |
+| 9 | `fitinfo` | Fit (status text) | no |
+| 10–57 | `b{n}on`, `b{n}type`, `b{n}freq`, `b{n}gain`, `b{n}q`, `b{n}slope` | B*n* On … Slope, n = 1…8 | yes |
+| 58–89 | `draw1` … `draw32` | Draw 1 … 32 (the drawing, saved with the project) | no |
+| 90–121 | `spec1` … `spec32` | Spectrum display | no |
+| 122–153 | `resp1` … `resp32` | EQ response display | no |
