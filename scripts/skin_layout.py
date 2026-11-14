@@ -74,15 +74,6 @@ SEG_Y, SEG_H = 530, 40
 SWITCHES = {                                  # parameter: (captions, segment width)
     'Analyze': (['PRE', 'POST'], 130),
     'Speed': (['SLOW', 'MED', 'FAST'], 92),
-    'Display': (['NORMAL', 'LIGHT', 'SILENT'], 200),   # TEST tab (temporary)
 }
-TEST_SWITCH_Y = 120
 BOTTOM = [('OUTPUT', 'knob', 'Output'), ('MAX BANDS', 'knob', 'Max Bands'),
           ('ANALYZER', 'switch', 'Analyze'), ('SPEED', 'switch', 'Speed')]
-
-# ---- BANDS tabs: 4 bands x 6 controls -----------------------------------------------------------
-BAND_FIELDS = ['On', 'Type', 'Freq', 'Gain', 'Q', 'Slope']
-BAND_COL_X = [32 + i * 204 for i in range(6)]
-BAND_COL_W = 196
-BAND_ROW_Y = [12 + r * 152 for r in range(4)]
-BAND_ROW_H = 107

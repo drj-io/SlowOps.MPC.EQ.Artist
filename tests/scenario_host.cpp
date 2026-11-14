@@ -25,7 +25,7 @@ static int g_fail = 0, g_pass = 0;
 
 // Parameter indices (plugin/src/EqArtist.cpp).
 enum P { kOutput, kClear, kUndo, kMaxBands, kAnalyzer, kAnalyze, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
-         kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kDispMode = kResp0 + 32, kNum };
+         kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kNum = kResp0 + 32 };
 static constexpr int kCols = 32;
 static int bandOn(int b) { return kBand0 + b * 6; }
 
@@ -312,20 +312,6 @@ int main(int argc, char** argv)
             std::printf("  spectrum + curve: %.0f updates per second\n", perSec);
             CHECK(perSec <= 400.0, "%.0f display updates per second (budget 360)", perSec);
             CHECK(perSec > 50.0, "the spectrum hardly moves (%.0f updates per second)", perSec);
-            // TEST tab modes: Light sends a quarter; Silent sends nothing but still moves the values.
-            p.set(kDispMode, 0.5f);
-            long b2 = automateTotal(kSpec0, kResp0 + kCols);
-            for (int k = 0; k < (int)(4.0 * SR / 128); ++k) p.beatBlock();
-            const double light = (automateTotal(kSpec0, kResp0 + kCols) - b2) / 4.0;
-            std::printf("  Light: %.0f updates per second\n", light);
-            CHECK(light <= 61.0 && light > 10.0, "Light sends %.0f per second", light);
-            p.set(kDispMode, 1.0f);
-            b2 = automateTotal(kSpec0, kResp0 + kCols);
-            float moved = 0, last = p.get(kSpec0 + 10);
-            for (int k = 0; k < (int)(2.0 * SR / 128); ++k) { p.beatBlock(); moved += std::fabs(p.get(kSpec0 + 10) - last); last = p.get(kSpec0 + 10); }
-            CHECK(automateTotal(kSpec0, kResp0 + kCols) == b2, "Silent still sent updates");
-            CHECK(moved > 0.5f, "Silent: the spectrum values did not move");
-            p.set(kDispMode, 0.0f);
         }
 
         std::printf("== the spectrum display follows the input\n");

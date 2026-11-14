@@ -18,7 +18,7 @@ EQ tab (back to front):
   * the bottom row: Output and Max Bands knobs (the SDK kit knob, value label beside it), and
     PRE | POST and SLOW | MED | FAST switches (radio groups of image buttons). Their captions are
     drawn into bg.png.
-BANDS 1-4 / BANDS 5-8: one row per band: On, Type, Freq, Gain, Q, Slope.
+One tab. The band parameters have no page: the fit sets them, the Q-Links turn Freq / Gain.
 """
 import json
 import os
@@ -83,10 +83,6 @@ def segment(name, img, handle, button_id, n, r):
                                   'gestureBehaviour': 'Instant'}, r, 'Hide')
 
 
-def slider(name, handle, r):
-    return entry(name, 'Slider', {'version': 1, 'handleName': handle}, r, 'Hide', 'Yes')
-
-
 def xypad(name, x_handle, y_handle, img, r):
     # Exactly the entry the hardware spike used (version 1 bounds, hardware focus on).
     return entry(name, 'XYPad', {'version': 1, 'xPositionHandle': x_handle, 'yPositionHandle': y_handle,
@@ -140,22 +136,11 @@ def eq_tab():
     return out
 
 
-def bands_tab(first):
-    out = []
-    for r in range(4):
-        b = first + r + 1
-        for c, field in enumerate(L.BAND_FIELDS):
-            out.append(slider('b%d %s' % (b, field.lower()), P('B%d %s' % (b, field)),
-                              (L.BAND_COL_X[c], L.BAND_ROW_Y[r], L.BAND_COL_W, L.BAND_ROW_H)))
-    return out
-
-
 def main():
     types = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt']
     slopes = ['6 dB', '12 dB', '18 dB', '24 dB', '36 dB', '48 dB']
     reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Clear', 'Undo', 'Bypass', 'Analyzer')]
-    reps += [{'key': P('Display'), 'value': ['Normal', 'Light', 'Silent']},
-             {'key': P('Analyze'), 'value': ['Pre', 'Post']},
+    reps += [{'key': P('Analyze'), 'value': ['Pre', 'Post']},
              {'key': P('Speed'), 'value': ['Slow', 'Medium', 'Fast']},
              {'key': P('Max Bands'), 'value': [str(k) for k in range(1, 9)]}]
     for b in range(1, 9):
@@ -163,20 +148,16 @@ def main():
                  {'key': P('B%d Type' % b), 'value': types},
                  {'key': P('B%d Slope' % b), 'value': slopes}]
 
-    eq, b14, b58 = eq_tab(), bands_tab(0), bands_tab(4)
-    # TEST (temporary hardware experiment): the spectrum under the three display-update modes.
-    labels, w = L.SWITCHES['Display']
-    test = [segment('display %s' % lab.lower(), 'seg_' + lab.lower(), P('Display'), i, len(labels),
-                    (32 + i * (w + 12), L.TEST_SWITCH_Y, w, 56)) for i, lab in enumerate(labels)]
+    eq = eq_tab()
     tui = {'pageData': {
         'version': 1,
         'componentDefinitions': {'version': 2, 'importFiles': [], 'localComponentDefinitions': []},
         'replacementStrings': reps,
         'info': {'version': 1, 'type': 'CompleteDescription'},
-        'tabs': [tab('EQ', 0, eq), tab('BANDS 1-4', 1, b14), tab('BANDS 5-8', 2, b58), tab('TEST', 3, test)]}}
+        'tabs': [tab('EQ', 0, eq)]}}
 
     # Q-Links (4 x 4, Q-Link 13 top left). EQ tab and Program mode: Freq / Gain of all 8 bands,
-    # two bands per row. BANDS tabs: one band per row: Freq, Gain, Q, Type.
+    # two bands per row.
     def row_base(r):
         return 13 - 4 * r
 
@@ -185,13 +166,6 @@ def main():
         base = row_base(b // 2) + 2 * (b % 2)
         eq_q['Q-Link %d' % base] = IDX['B%d Freq' % (b + 1)]
         eq_q['Q-Link %d' % (base + 1)] = IDX['B%d Gain' % (b + 1)]
-
-    def bands_q(first):
-        q = {}
-        for r in range(4):
-            for k, field in enumerate(('Freq', 'Gain', 'Q', 'Type')):
-                q['Q-Link %d' % (row_base(r) + k)] = IDX['B%d %s' % (first + r + 1, field)]
-        return q
 
     def full(m):
         return {'Q-Link %d' % k: m.get('Q-Link %d' % k, -1) for k in range(1, 17)}
@@ -202,16 +176,13 @@ def main():
         prog['Q-Link %d' % (2 * b + 2)] = IDX['B%d Gain' % (b + 1)]
     qlinks = {'version': 4, 'info': {'version': 1, 'type': 'CompleteDescription'},
               'Screen Mode Q-Links': {'version': 4, 'map': [
-                  {'Tab': 1, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(eq_q)},
-                  {'Tab': 2, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(0))},
-                  {'Tab': 3, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(4))},
-                  {'Tab': 4, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(eq_q)}]},
+                  {'Tab': 1, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(eq_q)}]},
               'Program Mode Q-Links': full(prog)}
 
     os.makedirs(OUT, exist_ok=True)
     json.dump(tui, open(os.path.join(OUT, 'TUI.json'), 'w'), indent=2)
     json.dump(qlinks, open(os.path.join(OUT, 'Q-Links.json'), 'w'), indent=2)
-    print('skins: TUI.json (EQ %d, BANDS 1-4 %d, BANDS 5-8 %d components), Q-Links.json' % (len(eq), len(b14), len(b58)))
+    print('skins: TUI.json (EQ %d components), Q-Links.json' % len(eq))
 
 
 if __name__ == '__main__':

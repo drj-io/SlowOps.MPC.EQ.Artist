@@ -7,10 +7,9 @@ An EQ for the Akai MPC standalone (MPC OS 3.10.1+, insert effect) that you draw:
    using zero-latency filters that follow their analog shapes, so high bands keep their width instead of
    narrowing towards 20 kHz.
 2. **UNDO** takes back a stroke; **CLEAR** goes back to flat.
-3. Fine-tune each band's Freq / Gain / Q / Type / Slope on the BANDS pages or with the Q-Links; the drawing
-   follows.
+3. Fine-tune each band's Freq and Gain with the Q-Links; the drawing follows.
 
-**Status: 0.3.2.** Tested in the desktop simulator, and the drawing surface on an MPC Live III.
+**Status: 0.4.0.** Tested in the desktop simulator, and the drawing surface on an MPC Live III.
 Controls: [docs/CONTROLS.md](docs/CONTROLS.md). How the drawing surface was chosen (the pen won):
 [docs/SPIKE.md](docs/SPIKE.md).
 
