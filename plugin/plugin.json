@@ -1,0 +1,16 @@
+{
+  "name": "EQ Artist",
+  "manufacturer": "Slow Ops",
+  "version": "0.1.0",
+  "format": "vst2",
+  "kind": "effect",
+  "uid": "SoEq",
+  "numInputs": 2,
+  "numOutputs": 2,
+  "category": "Effect",
+  "file32": "VST/eqartist-arm32.so",
+  "file64": "VST/eqartist-arm64.so",
+  "description": "Draw an EQ curve over a live spectrum and apply it as real parametric bands. (Spike build: drawing-surface hardware test.)",
+  "author": "Slow Ops",
+  "license": "MIT"
+}
