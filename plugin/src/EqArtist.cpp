@@ -46,7 +46,8 @@ public:
         kClear,       // trigger: flat drawing, no bands
         kUndo,        // trigger: undo the last stroke or Clear (press again to redo)
         kMaxBands,    // 1..8: how many bands the fit may use
-        kAnalyzer,    // Off / Pre / Post
+        kAnalyzer,    // spectrum on / off
+        kAnalyze,     // spectrum of the input (Pre) or the output (Post)
         kSpeed,       // analyser fall: Slow / Medium / Fast
         kBypass,
         kPenX,        // the pen XYPad (input only)
@@ -68,7 +69,8 @@ public:
         addParam(mpc::boolParam("clear", "Clear", false));
         addParam(mpc::boolParam("undo", "Undo", false));
         addParam(mpc::intParam("maxbands", "Max Bands", 1, kBands, kBands));
-        addParam(mpc::choiceParam("analyzer", "Analyzer", {"Off", "Pre", "Post"}, 1));
+        addParam(mpc::boolParam("analyzer", "Analyzer", true));
+        addParam(mpc::choiceParam("analyze", "Analyze", {"Pre", "Post"}, 0));
         addParam(mpc::choiceParam("speed", "Speed", {"Slow", "Medium", "Fast"}, 1));
         addParam(mpc::boolParam("bypass", "Bypass", false));
         addDisplay(mpc::floatParam("penx", "Pen X", 0.0f, 1.0f, 0.5f, "", 3));
@@ -156,7 +158,7 @@ public:
         pullBands();
         syncDrawingToHandEdits(n);
 
-        const int analyzer = getInt(kAnalyzer);
+        const int analyzer = !getBool(kAnalyzer) ? 0 : (getInt(kAnalyze) == 0 ? 1 : 2);   // off / pre / post
         if (analyzer == 1) for (int i = 0; i < n; ++i) spectrum_.push(0.5f * (inL[i] + inR[i]));
         engine_.setOutputDb(get(kOutput));
         engine_.setBypass(getBool(kBypass));
@@ -210,7 +212,7 @@ private:
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 300;   // 0.3.0
+        info.version = 310;   // 0.3.1
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;

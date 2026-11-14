@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Draw everything with text into plugin/skins/ (needs Pillow): the labelled buttons, and the
-graph's frequency and dB labels onto bg.png.
+"""Draw everything with text into plugin/skins/ (needs Pillow): the labelled buttons and switch
+segments, and the graph's frequency / dB labels and the bottom-row captions onto bg.png.
 
 On the MPC, fixed-text Label widgets do not show, and text cannot sit over an image button, so
 all fixed text is drawn into the images. The font is Titillium Web Bold (SIL OFL 1.1,
@@ -56,13 +56,33 @@ def axis_labels():
     print('  bg.png: axis labels')
 
 
+def captions():
+    """The bottom row's captions, onto bg.png."""
+    path = os.path.join(OUT, 'bg.png')
+    img = Image.open(path).convert('RGBA')
+    layer = Image.new('RGBA', (img.width * SS, img.height * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    font = ImageFont.truetype(FONT, 16 * SS)
+    for (caption, _, _), x in zip(L.BOTTOM, L.BLOCK_X):
+        box = d.textbbox((0, 0), caption, font=font)
+        d.text((x * SS - box[0], L.CAPTION_Y * SS - box[1]), caption, font=font, fill=L.TEXT_DIM + (255,))
+    Image.alpha_composite(img, layer.resize(img.size, Image.LANCZOS)).save(path)
+    print('  bg.png: bottom-row captions')
+
+
 def main():
     axis_labels()
+    captions()
     for name, label in L.BUTTONS:
         hot = L.WARN if name == 'Bypass' else L.GLOW
         face(label, L.PANEL, 0.9, L.GRID_HI, L.TEXT).save(os.path.join(OUT, '%s_off.png' % label.lower()))
         face(label, hot, 0.55, L.CURVE, (255, 255, 255)).save(os.path.join(OUT, '%s_on.png' % label.lower()))
         print('  %s_on.png / %s_off.png' % (label.lower(), label.lower()))
+    for param, (labels, w) in L.SWITCHES.items():
+        for label in labels:
+            face(label, L.PANEL, 0.9, L.GRID_HI, L.TEXT_DIM, w, L.SEG_H).save(os.path.join(OUT, 'seg_%s_off.png' % label.lower()))
+            face(label, L.GLOW, 0.55, L.CURVE, (255, 255, 255), w, L.SEG_H).save(os.path.join(OUT, 'seg_%s_on.png' % label.lower()))
+            print('  seg_%s_on.png / seg_%s_off.png' % (label.lower(), label.lower()))
 
 
 if __name__ == '__main__':

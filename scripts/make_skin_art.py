@@ -11,7 +11,9 @@ palette in skin_layout.py changes.
   draw_dot.png  38 x (432 x 37)  the drawing: a smaller, dimmer dot (frame k = -18 + k dB)
 
 Text (button labels, graph axis labels on bg.png) comes from make_text_art.py (needs Pillow),
-which must run after this script.
+which must run after this script. knob_uni.png is the SDK kit knob in our purple:
+  python3 third_party/mpc-plugin-builder-sdk/tools/make_ui_kit.py --out plugin/skins --accent ff9971c0 --only knob_uni
+(then delete the kit.json it writes).
 
 Film strips stack frames top to bottom and stay under 16384 px tall.
 """

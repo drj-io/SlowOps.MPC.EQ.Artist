@@ -60,13 +60,23 @@ DB_LINES = [-12, -6, 0, 6, 12]
 # ---- EQ tab: buttons and status (top strip), controls (bottom row) ---------------------------
 BUTTON_W, BUTTON_H = 170, 38
 BUTTON_Y = 5
-BUTTONS = [('Clear', 'CLEAR'), ('Undo', 'UNDO'), ('Bypass', 'BYPASS')]
-BUTTON_X = [32, 216, 400]
-FIT_INFO = (600, 5, 648, 38)
-CONTROL_Y, CONTROL_H = 498, 107
-CONTROLS = ['Output', 'Max Bands', 'Analyzer', 'Speed']
-CONTROL_W = 260
-CONTROL_X = [32 + i * 318.67 for i in range(len(CONTROLS))]
+BUTTONS = [('Clear', 'CLEAR'), ('Undo', 'UNDO'), ('Bypass', 'BYPASS'), ('Analyzer', 'ANALYZER')]
+BUTTON_X = [32, 216, 400, 584]
+FIT_INFO = (780, 5, 468, 38)
+
+# Bottom row: four blocks, each with its caption drawn into bg.png above it.
+BLOCK_X = [32, 342, 652, 962]
+CAPTION_Y = 492
+KNOB = 90                                     # the SDK kit knob (make_ui_kit.py), 127 frames
+KNOB_Y = 520
+KNOB_VALUE = (100, 540, 190, 46)              # value label, relative to the block's x
+SEG_Y, SEG_H = 530, 40
+SWITCHES = {                                  # parameter: (captions, segment width)
+    'Analyze': (['PRE', 'POST'], 130),
+    'Speed': (['SLOW', 'MED', 'FAST'], 92),
+}
+BOTTOM = [('OUTPUT', 'knob', 'Output'), ('MAX BANDS', 'knob', 'Max Bands'),
+          ('ANALYZER', 'switch', 'Analyze'), ('SPEED', 'switch', 'Speed')]
 
 # ---- BANDS tabs: 4 bands x 6 controls -----------------------------------------------------------
 BAND_FIELDS = ['On', 'Type', 'Freq', 'Gain', 'Q', 'Slope']

@@ -24,7 +24,7 @@ static int g_fail = 0, g_pass = 0;
 #define CHECK(cond, ...) do { if (cond) { ++g_pass; } else { ++g_fail; std::printf("  FAIL %s:%d: ", __FILE__, __LINE__); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
 
 // Parameter indices (plugin/src/EqArtist.cpp).
-enum P { kOutput, kClear, kUndo, kMaxBands, kAnalyzer, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
+enum P { kOutput, kClear, kUndo, kMaxBands, kAnalyzer, kAnalyze, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
          kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kNum = kResp0 + 32 };
 static constexpr int kCols = 32;
 static int bandOn(int b) { return kBand0 + b * 6; }
@@ -282,10 +282,14 @@ int main(int argc, char** argv)
         int best = 0;
         for (int c = 1; c < kCols; ++c) if (p.get(kSpec0 + c) > p.get(kSpec0 + best)) best = c;
         CHECK(best == 18, "1 kHz lights column %d, expected 19 (976..1210 Hz)", best + 1);
+        p.set(kAnalyze, 1.0f); p.run(0.5, 1000.0);   // Post: same column (the EQ is nearly flat at 1 kHz)
+        best = 0;
+        for (int c = 1; c < kCols; ++c) if (p.get(kSpec0 + c) > p.get(kSpec0 + best)) best = c;
+        CHECK(best == 18, "Post: 1 kHz lights column %d", best + 1);
         p.set(kAnalyzer, 0.0f); p.run(0.2, 1000.0);
         bool dark = true;
         for (int c = 0; c < kCols; ++c) dark = dark && p.get(kSpec0 + c) == 0.0f;
-        CHECK(dark, "Analyzer Off still shows a spectrum");
+        CHECK(dark, "Analyzer off still shows a spectrum");
     }
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;

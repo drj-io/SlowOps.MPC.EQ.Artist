@@ -22,7 +22,7 @@
         ]
       },
       {
-        "key": "Parameter 6",
+        "key": "Parameter 7",
         "value": [
           "Off",
           "On"
@@ -32,12 +32,18 @@
         "key": "Parameter 4",
         "value": [
           "Off",
+          "On"
+        ]
+      },
+      {
+        "key": "Parameter 5",
+        "value": [
           "Pre",
           "Post"
         ]
       },
       {
-        "key": "Parameter 5",
+        "key": "Parameter 6",
         "value": [
           "Slow",
           "Medium",
@@ -58,14 +64,14 @@
         ]
       },
       {
-        "key": "Parameter 10",
+        "key": "Parameter 11",
         "value": [
           "Off",
           "On"
         ]
       },
       {
-        "key": "Parameter 11",
+        "key": "Parameter 12",
         "value": [
           "Bell",
           "Low Shelf",
@@ -75,29 +81,29 @@
           "Notch",
           "Band Pass",
           "Tilt"
-        ]
-      },
-      {
-        "key": "Parameter 15",
-        "value": [
-          "6 dB",
-          "12 dB",
-          "18 dB",
-          "24 dB",
-          "36 dB",
-          "48 dB"
         ]
       },
       {
         "key": "Parameter 16",
         "value": [
-          "Off",
-          "On"
+          "6 dB",
+          "12 dB",
+          "18 dB",
+          "24 dB",
+          "36 dB",
+          "48 dB"
         ]
       },
       {
         "key": "Parameter 17",
         "value": [
+          "Off",
+          "On"
+        ]
+      },
+      {
+        "key": "Parameter 18",
+        "value": [
           "Bell",
           "Low Shelf",
           "High Shelf",
@@ -106,29 +112,29 @@
           "Notch",
           "Band Pass",
           "Tilt"
-        ]
-      },
-      {
-        "key": "Parameter 21",
-        "value": [
-          "6 dB",
-          "12 dB",
-          "18 dB",
-          "24 dB",
-          "36 dB",
-          "48 dB"
         ]
       },
       {
         "key": "Parameter 22",
         "value": [
-          "Off",
-          "On"
+          "6 dB",
+          "12 dB",
+          "18 dB",
+          "24 dB",
+          "36 dB",
+          "48 dB"
         ]
       },
       {
         "key": "Parameter 23",
         "value": [
+          "Off",
+          "On"
+        ]
+      },
+      {
+        "key": "Parameter 24",
+        "value": [
           "Bell",
           "Low Shelf",
           "High Shelf",
@@ -137,29 +143,29 @@
           "Notch",
           "Band Pass",
           "Tilt"
-        ]
-      },
-      {
-        "key": "Parameter 27",
-        "value": [
-          "6 dB",
-          "12 dB",
-          "18 dB",
-          "24 dB",
-          "36 dB",
-          "48 dB"
         ]
       },
       {
         "key": "Parameter 28",
         "value": [
-          "Off",
-          "On"
+          "6 dB",
+          "12 dB",
+          "18 dB",
+          "24 dB",
+          "36 dB",
+          "48 dB"
         ]
       },
       {
         "key": "Parameter 29",
         "value": [
+          "Off",
+          "On"
+        ]
+      },
+      {
+        "key": "Parameter 30",
+        "value": [
           "Bell",
           "Low Shelf",
           "High Shelf",
@@ -168,29 +174,29 @@
           "Notch",
           "Band Pass",
           "Tilt"
-        ]
-      },
-      {
-        "key": "Parameter 33",
-        "value": [
-          "6 dB",
-          "12 dB",
-          "18 dB",
-          "24 dB",
-          "36 dB",
-          "48 dB"
         ]
       },
       {
         "key": "Parameter 34",
         "value": [
-          "Off",
-          "On"
+          "6 dB",
+          "12 dB",
+          "18 dB",
+          "24 dB",
+          "36 dB",
+          "48 dB"
         ]
       },
       {
         "key": "Parameter 35",
         "value": [
+          "Off",
+          "On"
+        ]
+      },
+      {
+        "key": "Parameter 36",
+        "value": [
           "Bell",
           "Low Shelf",
           "High Shelf",
@@ -199,29 +205,29 @@
           "Notch",
           "Band Pass",
           "Tilt"
-        ]
-      },
-      {
-        "key": "Parameter 39",
-        "value": [
-          "6 dB",
-          "12 dB",
-          "18 dB",
-          "24 dB",
-          "36 dB",
-          "48 dB"
         ]
       },
       {
         "key": "Parameter 40",
         "value": [
-          "Off",
-          "On"
+          "6 dB",
+          "12 dB",
+          "18 dB",
+          "24 dB",
+          "36 dB",
+          "48 dB"
         ]
       },
       {
         "key": "Parameter 41",
         "value": [
+          "Off",
+          "On"
+        ]
+      },
+      {
+        "key": "Parameter 42",
+        "value": [
           "Bell",
           "Low Shelf",
           "High Shelf",
@@ -230,28 +236,28 @@
           "Notch",
           "Band Pass",
           "Tilt"
-        ]
-      },
-      {
-        "key": "Parameter 45",
-        "value": [
-          "6 dB",
-          "12 dB",
-          "18 dB",
-          "24 dB",
-          "36 dB",
-          "48 dB"
         ]
       },
       {
         "key": "Parameter 46",
         "value": [
+          "6 dB",
+          "12 dB",
+          "18 dB",
+          "24 dB",
+          "36 dB",
+          "48 dB"
+        ]
+      },
+      {
+        "key": "Parameter 47",
+        "value": [
           "Off",
           "On"
         ]
       },
       {
-        "key": "Parameter 47",
+        "key": "Parameter 48",
         "value": [
           "Bell",
           "Low Shelf",
@@ -264,7 +270,7 @@
         ]
       },
       {
-        "key": "Parameter 51",
+        "key": "Parameter 52",
         "value": [
           "6 dB",
           "12 dB",
@@ -275,14 +281,14 @@
         ]
       },
       {
-        "key": "Parameter 52",
+        "key": "Parameter 53",
         "value": [
           "Off",
           "On"
         ]
       },
       {
-        "key": "Parameter 53",
+        "key": "Parameter 54",
         "value": [
           "Bell",
           "Low Shelf",
@@ -295,7 +301,7 @@
         ]
       },
       {
-        "key": "Parameter 57",
+        "key": "Parameter 58",
         "value": [
           "6 dB",
           "12 dB",
@@ -347,7 +353,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 90"
+                  "handleName": "Parameter 91"
                 }
               },
               "handle remapping": {
@@ -375,7 +381,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 91"
+                  "handleName": "Parameter 92"
                 }
               },
               "handle remapping": {
@@ -403,7 +409,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 92"
+                  "handleName": "Parameter 93"
                 }
               },
               "handle remapping": {
@@ -431,7 +437,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 93"
+                  "handleName": "Parameter 94"
                 }
               },
               "handle remapping": {
@@ -459,7 +465,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 94"
+                  "handleName": "Parameter 95"
                 }
               },
               "handle remapping": {
@@ -487,7 +493,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 95"
+                  "handleName": "Parameter 96"
                 }
               },
               "handle remapping": {
@@ -515,7 +521,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 96"
+                  "handleName": "Parameter 97"
                 }
               },
               "handle remapping": {
@@ -543,7 +549,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 97"
+                  "handleName": "Parameter 98"
                 }
               },
               "handle remapping": {
@@ -571,7 +577,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 98"
+                  "handleName": "Parameter 99"
                 }
               },
               "handle remapping": {
@@ -599,7 +605,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 99"
+                  "handleName": "Parameter 100"
                 }
               },
               "handle remapping": {
@@ -627,7 +633,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 100"
+                  "handleName": "Parameter 101"
                 }
               },
               "handle remapping": {
@@ -655,7 +661,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 101"
+                  "handleName": "Parameter 102"
                 }
               },
               "handle remapping": {
@@ -683,7 +689,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 102"
+                  "handleName": "Parameter 103"
                 }
               },
               "handle remapping": {
@@ -711,7 +717,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 103"
+                  "handleName": "Parameter 104"
                 }
               },
               "handle remapping": {
@@ -739,7 +745,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 104"
+                  "handleName": "Parameter 105"
                 }
               },
               "handle remapping": {
@@ -767,7 +773,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 105"
+                  "handleName": "Parameter 106"
                 }
               },
               "handle remapping": {
@@ -795,7 +801,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 106"
+                  "handleName": "Parameter 107"
                 }
               },
               "handle remapping": {
@@ -823,7 +829,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 107"
+                  "handleName": "Parameter 108"
                 }
               },
               "handle remapping": {
@@ -851,7 +857,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 108"
+                  "handleName": "Parameter 109"
                 }
               },
               "handle remapping": {
@@ -879,7 +885,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 109"
+                  "handleName": "Parameter 110"
                 }
               },
               "handle remapping": {
@@ -907,7 +913,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 110"
+                  "handleName": "Parameter 111"
                 }
               },
               "handle remapping": {
@@ -935,7 +941,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 111"
+                  "handleName": "Parameter 112"
                 }
               },
               "handle remapping": {
@@ -963,7 +969,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 112"
+                  "handleName": "Parameter 113"
                 }
               },
               "handle remapping": {
@@ -991,7 +997,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 113"
+                  "handleName": "Parameter 114"
                 }
               },
               "handle remapping": {
@@ -1019,7 +1025,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 114"
+                  "handleName": "Parameter 115"
                 }
               },
               "handle remapping": {
@@ -1047,7 +1053,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 115"
+                  "handleName": "Parameter 116"
                 }
               },
               "handle remapping": {
@@ -1075,7 +1081,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 116"
+                  "handleName": "Parameter 117"
                 }
               },
               "handle remapping": {
@@ -1103,7 +1109,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 117"
+                  "handleName": "Parameter 118"
                 }
               },
               "handle remapping": {
@@ -1131,7 +1137,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 118"
+                  "handleName": "Parameter 119"
                 }
               },
               "handle remapping": {
@@ -1159,7 +1165,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 119"
+                  "handleName": "Parameter 120"
                 }
               },
               "handle remapping": {
@@ -1187,7 +1193,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 120"
+                  "handleName": "Parameter 121"
                 }
               },
               "handle remapping": {
@@ -1215,7 +1221,7 @@
                   "colour": "0",
                   "image": "spec_bar.png",
                   "numFrames": 36,
-                  "handleName": "Parameter 121"
+                  "handleName": "Parameter 122"
                 }
               },
               "handle remapping": {
@@ -1243,7 +1249,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 122"
+                  "handleName": "Parameter 123"
                 }
               },
               "handle remapping": {
@@ -1271,7 +1277,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 123"
+                  "handleName": "Parameter 124"
                 }
               },
               "handle remapping": {
@@ -1299,7 +1305,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 124"
+                  "handleName": "Parameter 125"
                 }
               },
               "handle remapping": {
@@ -1327,7 +1333,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 125"
+                  "handleName": "Parameter 126"
                 }
               },
               "handle remapping": {
@@ -1355,7 +1361,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 126"
+                  "handleName": "Parameter 127"
                 }
               },
               "handle remapping": {
@@ -1383,7 +1389,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 127"
+                  "handleName": "Parameter 128"
                 }
               },
               "handle remapping": {
@@ -1411,7 +1417,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 128"
+                  "handleName": "Parameter 129"
                 }
               },
               "handle remapping": {
@@ -1439,7 +1445,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 129"
+                  "handleName": "Parameter 130"
                 }
               },
               "handle remapping": {
@@ -1467,7 +1473,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 130"
+                  "handleName": "Parameter 131"
                 }
               },
               "handle remapping": {
@@ -1495,7 +1501,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 131"
+                  "handleName": "Parameter 132"
                 }
               },
               "handle remapping": {
@@ -1523,7 +1529,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 132"
+                  "handleName": "Parameter 133"
                 }
               },
               "handle remapping": {
@@ -1551,7 +1557,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 133"
+                  "handleName": "Parameter 134"
                 }
               },
               "handle remapping": {
@@ -1579,7 +1585,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 134"
+                  "handleName": "Parameter 135"
                 }
               },
               "handle remapping": {
@@ -1607,7 +1613,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 135"
+                  "handleName": "Parameter 136"
                 }
               },
               "handle remapping": {
@@ -1635,7 +1641,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 136"
+                  "handleName": "Parameter 137"
                 }
               },
               "handle remapping": {
@@ -1663,7 +1669,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 137"
+                  "handleName": "Parameter 138"
                 }
               },
               "handle remapping": {
@@ -1691,7 +1697,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 138"
+                  "handleName": "Parameter 139"
                 }
               },
               "handle remapping": {
@@ -1719,7 +1725,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 139"
+                  "handleName": "Parameter 140"
                 }
               },
               "handle remapping": {
@@ -1747,7 +1753,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 140"
+                  "handleName": "Parameter 141"
                 }
               },
               "handle remapping": {
@@ -1775,7 +1781,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 141"
+                  "handleName": "Parameter 142"
                 }
               },
               "handle remapping": {
@@ -1803,7 +1809,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 142"
+                  "handleName": "Parameter 143"
                 }
               },
               "handle remapping": {
@@ -1831,7 +1837,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 143"
+                  "handleName": "Parameter 144"
                 }
               },
               "handle remapping": {
@@ -1859,7 +1865,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 144"
+                  "handleName": "Parameter 145"
                 }
               },
               "handle remapping": {
@@ -1887,7 +1893,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 145"
+                  "handleName": "Parameter 146"
                 }
               },
               "handle remapping": {
@@ -1915,7 +1921,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 146"
+                  "handleName": "Parameter 147"
                 }
               },
               "handle remapping": {
@@ -1943,7 +1949,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 147"
+                  "handleName": "Parameter 148"
                 }
               },
               "handle remapping": {
@@ -1971,7 +1977,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 148"
+                  "handleName": "Parameter 149"
                 }
               },
               "handle remapping": {
@@ -1999,7 +2005,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 149"
+                  "handleName": "Parameter 150"
                 }
               },
               "handle remapping": {
@@ -2027,7 +2033,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 150"
+                  "handleName": "Parameter 151"
                 }
               },
               "handle remapping": {
@@ -2055,7 +2061,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 151"
+                  "handleName": "Parameter 152"
                 }
               },
               "handle remapping": {
@@ -2083,7 +2089,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 152"
+                  "handleName": "Parameter 153"
                 }
               },
               "handle remapping": {
@@ -2111,7 +2117,7 @@
                   "colour": "0",
                   "image": "dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 153"
+                  "handleName": "Parameter 154"
                 }
               },
               "handle remapping": {
@@ -2139,7 +2145,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 58"
+                  "handleName": "Parameter 59"
                 }
               },
               "handle remapping": {
@@ -2167,7 +2173,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 59"
+                  "handleName": "Parameter 60"
                 }
               },
               "handle remapping": {
@@ -2195,7 +2201,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 60"
+                  "handleName": "Parameter 61"
                 }
               },
               "handle remapping": {
@@ -2223,7 +2229,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 61"
+                  "handleName": "Parameter 62"
                 }
               },
               "handle remapping": {
@@ -2251,7 +2257,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 62"
+                  "handleName": "Parameter 63"
                 }
               },
               "handle remapping": {
@@ -2279,7 +2285,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 63"
+                  "handleName": "Parameter 64"
                 }
               },
               "handle remapping": {
@@ -2307,7 +2313,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 64"
+                  "handleName": "Parameter 65"
                 }
               },
               "handle remapping": {
@@ -2335,7 +2341,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 65"
+                  "handleName": "Parameter 66"
                 }
               },
               "handle remapping": {
@@ -2363,7 +2369,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 66"
+                  "handleName": "Parameter 67"
                 }
               },
               "handle remapping": {
@@ -2391,7 +2397,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 67"
+                  "handleName": "Parameter 68"
                 }
               },
               "handle remapping": {
@@ -2419,7 +2425,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 68"
+                  "handleName": "Parameter 69"
                 }
               },
               "handle remapping": {
@@ -2447,7 +2453,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 69"
+                  "handleName": "Parameter 70"
                 }
               },
               "handle remapping": {
@@ -2475,7 +2481,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 70"
+                  "handleName": "Parameter 71"
                 }
               },
               "handle remapping": {
@@ -2503,7 +2509,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 71"
+                  "handleName": "Parameter 72"
                 }
               },
               "handle remapping": {
@@ -2531,7 +2537,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 72"
+                  "handleName": "Parameter 73"
                 }
               },
               "handle remapping": {
@@ -2559,7 +2565,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 73"
+                  "handleName": "Parameter 74"
                 }
               },
               "handle remapping": {
@@ -2587,7 +2593,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 74"
+                  "handleName": "Parameter 75"
                 }
               },
               "handle remapping": {
@@ -2615,7 +2621,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 75"
+                  "handleName": "Parameter 76"
                 }
               },
               "handle remapping": {
@@ -2643,7 +2649,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 76"
+                  "handleName": "Parameter 77"
                 }
               },
               "handle remapping": {
@@ -2671,7 +2677,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 77"
+                  "handleName": "Parameter 78"
                 }
               },
               "handle remapping": {
@@ -2699,7 +2705,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 78"
+                  "handleName": "Parameter 79"
                 }
               },
               "handle remapping": {
@@ -2727,7 +2733,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 79"
+                  "handleName": "Parameter 80"
                 }
               },
               "handle remapping": {
@@ -2755,7 +2761,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 80"
+                  "handleName": "Parameter 81"
                 }
               },
               "handle remapping": {
@@ -2783,7 +2789,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 81"
+                  "handleName": "Parameter 82"
                 }
               },
               "handle remapping": {
@@ -2811,7 +2817,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 82"
+                  "handleName": "Parameter 83"
                 }
               },
               "handle remapping": {
@@ -2839,7 +2845,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 83"
+                  "handleName": "Parameter 84"
                 }
               },
               "handle remapping": {
@@ -2867,7 +2873,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 84"
+                  "handleName": "Parameter 85"
                 }
               },
               "handle remapping": {
@@ -2895,7 +2901,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 85"
+                  "handleName": "Parameter 86"
                 }
               },
               "handle remapping": {
@@ -2923,7 +2929,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 86"
+                  "handleName": "Parameter 87"
                 }
               },
               "handle remapping": {
@@ -2951,7 +2957,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 87"
+                  "handleName": "Parameter 88"
                 }
               },
               "handle remapping": {
@@ -2979,7 +2985,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 88"
+                  "handleName": "Parameter 89"
                 }
               },
               "handle remapping": {
@@ -3007,7 +3013,7 @@
                   "colour": "0",
                   "image": "draw_dot.png",
                   "numFrames": 37,
-                  "handleName": "Parameter 89"
+                  "handleName": "Parameter 90"
                 }
               },
               "handle remapping": {
@@ -3031,8 +3037,8 @@
                 "type": "XYPad",
                 "data": {
                   "version": 1,
-                  "xPositionHandle": "Parameter 7",
-                  "yPositionHandle": "Parameter 8",
+                  "xPositionHandle": "Parameter 8",
+                  "yPositionHandle": "Parameter 9",
                   "image": "puck.png"
                 }
               },
@@ -3119,7 +3125,7 @@
                   "offImage": "bypass_off.png",
                   "buttonId": 1,
                   "numButtonsInGroup": 1,
-                  "handleName": "Parameter 6",
+                  "handleName": "Parameter 7",
                   "gestureBehaviour": "Instant"
                 }
               },
@@ -3134,6 +3140,35 @@
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
                 "bounds": "400 5 170 38"
+              }
+            },
+            {
+              "version": 2,
+              "componentData": {
+                "version": 1,
+                "name": "analyzer",
+                "type": "Button",
+                "data": {
+                  "version": 2,
+                  "onImage": "analyzer_on.png",
+                  "offImage": "analyzer_off.png",
+                  "buttonId": 1,
+                  "numButtonsInGroup": 1,
+                  "handleName": "Parameter 4",
+                  "gestureBehaviour": "Instant"
+                }
+              },
+              "handle remapping": {
+                "version": 1,
+                "map": []
+              },
+              "bounds": {
+                "version": 1,
+                "acceptsHWFocus": "No",
+                "showWhenDataModelInvalid": "Hide",
+                "whenVisible": "Always",
+                "boundsType": "Absolute",
+                "bounds": "584 5 170 38"
               }
             },
             {
@@ -3157,7 +3192,7 @@
                     "case": "Original"
                   },
                   "type": "Value",
-                  "handleName": "Parameter 9"
+                  "handleName": "Parameter 10"
                 }
               },
               "handle remapping": {
@@ -3170,7 +3205,7 @@
                 "showWhenDataModelInvalid": "Hide",
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
-                "bounds": "600 5 648 38"
+                "bounds": "780 5 468 38"
               }
             },
             {
@@ -3178,9 +3213,14 @@
               "componentData": {
                 "version": 1,
                 "name": "output",
-                "type": "Slider",
+                "type": "Knob",
                 "data": {
-                  "version": 1,
+                  "version": 3,
+                  "knobType": "FilmStrip",
+                  "filmStrip": "knob_uni.png",
+                  "numFrames": 127,
+                  "invert": false,
+                  "dragOrientation": "Vertical",
                   "handleName": "Parameter 0"
                 }
               },
@@ -3194,7 +3234,44 @@
                 "showWhenDataModelInvalid": "Hide",
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
-                "bounds": "32 498 260 107"
+                "bounds": "32 520 90 90"
+              }
+            },
+            {
+              "version": 2,
+              "componentData": {
+                "version": 1,
+                "name": "output value",
+                "type": "Label",
+                "data": {
+                  "version": 1,
+                  "textStyle": {
+                    "version": 1,
+                    "font": {
+                      "version": 1,
+                      "name": "Nexa",
+                      "style": "Bold",
+                      "height": 28.0
+                    },
+                    "colour": "ffccbbdd",
+                    "justification": "left verticallyCentred",
+                    "case": "Original"
+                  },
+                  "type": "Value",
+                  "handleName": "Parameter 0"
+                }
+              },
+              "handle remapping": {
+                "version": 1,
+                "map": []
+              },
+              "bounds": {
+                "version": 1,
+                "acceptsHWFocus": "No",
+                "showWhenDataModelInvalid": "Hide",
+                "whenVisible": "Always",
+                "boundsType": "Absolute",
+                "bounds": "132 540 190 46"
               }
             },
             {
@@ -3202,9 +3279,14 @@
               "componentData": {
                 "version": 1,
                 "name": "max bands",
-                "type": "Slider",
+                "type": "Knob",
                 "data": {
-                  "version": 1,
+                  "version": 3,
+                  "knobType": "FilmStrip",
+                  "filmStrip": "knob_uni.png",
+                  "numFrames": 127,
+                  "invert": false,
+                  "dragOrientation": "Vertical",
                   "handleName": "Parameter 3"
                 }
               },
@@ -3218,18 +3300,31 @@
                 "showWhenDataModelInvalid": "Hide",
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
-                "bounds": "350.67 498 260 107"
+                "bounds": "342 520 90 90"
               }
             },
             {
               "version": 2,
               "componentData": {
                 "version": 1,
-                "name": "analyzer",
-                "type": "Slider",
+                "name": "max bands value",
+                "type": "Label",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 4"
+                  "textStyle": {
+                    "version": 1,
+                    "font": {
+                      "version": 1,
+                      "name": "Nexa",
+                      "style": "Bold",
+                      "height": 28.0
+                    },
+                    "colour": "ffccbbdd",
+                    "justification": "left verticallyCentred",
+                    "case": "Original"
+                  },
+                  "type": "Value",
+                  "handleName": "Parameter 3"
                 }
               },
               "handle remapping": {
@@ -3238,22 +3333,27 @@
               },
               "bounds": {
                 "version": 1,
-                "acceptsHWFocus": "Yes",
+                "acceptsHWFocus": "No",
                 "showWhenDataModelInvalid": "Hide",
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
-                "bounds": "669.34 498 260 107"
+                "bounds": "442 540 190 46"
               }
             },
             {
               "version": 2,
               "componentData": {
                 "version": 1,
-                "name": "speed",
-                "type": "Slider",
+                "name": "analyzer pre",
+                "type": "Button",
                 "data": {
-                  "version": 1,
-                  "handleName": "Parameter 5"
+                  "version": 2,
+                  "onImage": "seg_pre_on.png",
+                  "offImage": "seg_pre_off.png",
+                  "buttonId": 0,
+                  "numButtonsInGroup": 2,
+                  "handleName": "Parameter 5",
+                  "gestureBehaviour": "Instant"
                 }
               },
               "handle remapping": {
@@ -3262,11 +3362,127 @@
               },
               "bounds": {
                 "version": 1,
-                "acceptsHWFocus": "Yes",
+                "acceptsHWFocus": "No",
                 "showWhenDataModelInvalid": "Hide",
                 "whenVisible": "Always",
                 "boundsType": "Absolute",
-                "bounds": "988.01 498 260 107"
+                "bounds": "652 530 130 40"
+              }
+            },
+            {
+              "version": 2,
+              "componentData": {
+                "version": 1,
+                "name": "analyzer post",
+                "type": "Button",
+                "data": {
+                  "version": 2,
+                  "onImage": "seg_post_on.png",
+                  "offImage": "seg_post_off.png",
+                  "buttonId": 1,
+                  "numButtonsInGroup": 2,
+                  "handleName": "Parameter 5",
+                  "gestureBehaviour": "Instant"
+                }
+              },
+              "handle remapping": {
+                "version": 1,
+                "map": []
+              },
+              "bounds": {
+                "version": 1,
+                "acceptsHWFocus": "No",
+                "showWhenDataModelInvalid": "Hide",
+                "whenVisible": "Always",
+                "boundsType": "Absolute",
+                "bounds": "788 530 130 40"
+              }
+            },
+            {
+              "version": 2,
+              "componentData": {
+                "version": 1,
+                "name": "speed slow",
+                "type": "Button",
+                "data": {
+                  "version": 2,
+                  "onImage": "seg_slow_on.png",
+                  "offImage": "seg_slow_off.png",
+                  "buttonId": 0,
+                  "numButtonsInGroup": 3,
+                  "handleName": "Parameter 6",
+                  "gestureBehaviour": "Instant"
+                }
+              },
+              "handle remapping": {
+                "version": 1,
+                "map": []
+              },
+              "bounds": {
+                "version": 1,
+                "acceptsHWFocus": "No",
+                "showWhenDataModelInvalid": "Hide",
+                "whenVisible": "Always",
+                "boundsType": "Absolute",
+                "bounds": "962 530 92 40"
+              }
+            },
+            {
+              "version": 2,
+              "componentData": {
+                "version": 1,
+                "name": "speed med",
+                "type": "Button",
+                "data": {
+                  "version": 2,
+                  "onImage": "seg_med_on.png",
+                  "offImage": "seg_med_off.png",
+                  "buttonId": 1,
+                  "numButtonsInGroup": 3,
+                  "handleName": "Parameter 6",
+                  "gestureBehaviour": "Instant"
+                }
+              },
+              "handle remapping": {
+                "version": 1,
+                "map": []
+              },
+              "bounds": {
+                "version": 1,
+                "acceptsHWFocus": "No",
+                "showWhenDataModelInvalid": "Hide",
+                "whenVisible": "Always",
+                "boundsType": "Absolute",
+                "bounds": "1060 530 92 40"
+              }
+            },
+            {
+              "version": 2,
+              "componentData": {
+                "version": 1,
+                "name": "speed fast",
+                "type": "Button",
+                "data": {
+                  "version": 2,
+                  "onImage": "seg_fast_on.png",
+                  "offImage": "seg_fast_off.png",
+                  "buttonId": 2,
+                  "numButtonsInGroup": 3,
+                  "handleName": "Parameter 6",
+                  "gestureBehaviour": "Instant"
+                }
+              },
+              "handle remapping": {
+                "version": 1,
+                "map": []
+              },
+              "bounds": {
+                "version": 1,
+                "acceptsHWFocus": "No",
+                "showWhenDataModelInvalid": "Hide",
+                "whenVisible": "Always",
+                "boundsType": "Absolute",
+                "bounds": "1158 530 92 40"
               }
             }
           ]
@@ -3305,7 +3521,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 10"
+                  "handleName": "Parameter 11"
                 }
               },
               "handle remapping": {
@@ -3329,7 +3545,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 11"
+                  "handleName": "Parameter 12"
                 }
               },
               "handle remapping": {
@@ -3353,7 +3569,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 12"
+                  "handleName": "Parameter 13"
                 }
               },
               "handle remapping": {
@@ -3377,7 +3593,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 13"
+                  "handleName": "Parameter 14"
                 }
               },
               "handle remapping": {
@@ -3401,7 +3617,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 14"
+                  "handleName": "Parameter 15"
                 }
               },
               "handle remapping": {
@@ -3425,7 +3641,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 15"
+                  "handleName": "Parameter 16"
                 }
               },
               "handle remapping": {
@@ -3449,7 +3665,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 16"
+                  "handleName": "Parameter 17"
                 }
               },
               "handle remapping": {
@@ -3473,7 +3689,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 17"
+                  "handleName": "Parameter 18"
                 }
               },
               "handle remapping": {
@@ -3497,7 +3713,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 18"
+                  "handleName": "Parameter 19"
                 }
               },
               "handle remapping": {
@@ -3521,7 +3737,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 19"
+                  "handleName": "Parameter 20"
                 }
               },
               "handle remapping": {
@@ -3545,7 +3761,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 20"
+                  "handleName": "Parameter 21"
                 }
               },
               "handle remapping": {
@@ -3569,7 +3785,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 21"
+                  "handleName": "Parameter 22"
                 }
               },
               "handle remapping": {
@@ -3593,7 +3809,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 22"
+                  "handleName": "Parameter 23"
                 }
               },
               "handle remapping": {
@@ -3617,7 +3833,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 23"
+                  "handleName": "Parameter 24"
                 }
               },
               "handle remapping": {
@@ -3641,7 +3857,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 24"
+                  "handleName": "Parameter 25"
                 }
               },
               "handle remapping": {
@@ -3665,7 +3881,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 25"
+                  "handleName": "Parameter 26"
                 }
               },
               "handle remapping": {
@@ -3689,7 +3905,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 26"
+                  "handleName": "Parameter 27"
                 }
               },
               "handle remapping": {
@@ -3713,7 +3929,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 27"
+                  "handleName": "Parameter 28"
                 }
               },
               "handle remapping": {
@@ -3737,7 +3953,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 28"
+                  "handleName": "Parameter 29"
                 }
               },
               "handle remapping": {
@@ -3761,7 +3977,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 29"
+                  "handleName": "Parameter 30"
                 }
               },
               "handle remapping": {
@@ -3785,7 +4001,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 30"
+                  "handleName": "Parameter 31"
                 }
               },
               "handle remapping": {
@@ -3809,7 +4025,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 31"
+                  "handleName": "Parameter 32"
                 }
               },
               "handle remapping": {
@@ -3833,7 +4049,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 32"
+                  "handleName": "Parameter 33"
                 }
               },
               "handle remapping": {
@@ -3857,7 +4073,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 33"
+                  "handleName": "Parameter 34"
                 }
               },
               "handle remapping": {
@@ -3909,7 +4125,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 34"
+                  "handleName": "Parameter 35"
                 }
               },
               "handle remapping": {
@@ -3933,7 +4149,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 35"
+                  "handleName": "Parameter 36"
                 }
               },
               "handle remapping": {
@@ -3957,7 +4173,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 36"
+                  "handleName": "Parameter 37"
                 }
               },
               "handle remapping": {
@@ -3981,7 +4197,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 37"
+                  "handleName": "Parameter 38"
                 }
               },
               "handle remapping": {
@@ -4005,7 +4221,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 38"
+                  "handleName": "Parameter 39"
                 }
               },
               "handle remapping": {
@@ -4029,7 +4245,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 39"
+                  "handleName": "Parameter 40"
                 }
               },
               "handle remapping": {
@@ -4053,7 +4269,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 40"
+                  "handleName": "Parameter 41"
                 }
               },
               "handle remapping": {
@@ -4077,7 +4293,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 41"
+                  "handleName": "Parameter 42"
                 }
               },
               "handle remapping": {
@@ -4101,7 +4317,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 42"
+                  "handleName": "Parameter 43"
                 }
               },
               "handle remapping": {
@@ -4125,7 +4341,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 43"
+                  "handleName": "Parameter 44"
                 }
               },
               "handle remapping": {
@@ -4149,7 +4365,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 44"
+                  "handleName": "Parameter 45"
                 }
               },
               "handle remapping": {
@@ -4173,7 +4389,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 45"
+                  "handleName": "Parameter 46"
                 }
               },
               "handle remapping": {
@@ -4197,7 +4413,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 46"
+                  "handleName": "Parameter 47"
                 }
               },
               "handle remapping": {
@@ -4221,7 +4437,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 47"
+                  "handleName": "Parameter 48"
                 }
               },
               "handle remapping": {
@@ -4245,7 +4461,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 48"
+                  "handleName": "Parameter 49"
                 }
               },
               "handle remapping": {
@@ -4269,7 +4485,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 49"
+                  "handleName": "Parameter 50"
                 }
               },
               "handle remapping": {
@@ -4293,7 +4509,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 50"
+                  "handleName": "Parameter 51"
                 }
               },
               "handle remapping": {
@@ -4317,7 +4533,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 51"
+                  "handleName": "Parameter 52"
                 }
               },
               "handle remapping": {
@@ -4341,7 +4557,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 52"
+                  "handleName": "Parameter 53"
                 }
               },
               "handle remapping": {
@@ -4365,7 +4581,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 53"
+                  "handleName": "Parameter 54"
                 }
               },
               "handle remapping": {
@@ -4389,7 +4605,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 54"
+                  "handleName": "Parameter 55"
                 }
               },
               "handle remapping": {
@@ -4413,7 +4629,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 55"
+                  "handleName": "Parameter 56"
                 }
               },
               "handle remapping": {
@@ -4437,7 +4653,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 56"
+                  "handleName": "Parameter 57"
                 }
               },
               "handle remapping": {
@@ -4461,7 +4677,7 @@
                 "type": "Slider",
                 "data": {
                   "version": 1,
-                  "handleName": "Parameter 57"
+                  "handleName": "Parameter 58"
                 }
               },
               "handle remapping": {

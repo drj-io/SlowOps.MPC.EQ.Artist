@@ -14,10 +14,11 @@ parameters are only appended. Indices are the order the MPC sees (`plugin/build/
 | **CLEAR** | Flat drawing, no bands. |
 | **UNDO** | Takes back the last stroke or Clear (drawing and sound together). Press again to redo. |
 | **BYPASS** | Lit when bypassed. Ramped (20 ms). |
-| **Output** | −24 … +12 dB. |
-| **Max Bands** | 1 … 8: the most bands the fit may use. Fewer bands give a simpler, broader EQ. |
-| **Analyzer** | Off / Pre (input) / Post (output) spectrum behind the curve. |
-| **Speed** | How fast the spectrum falls: Slow 12, Medium 24, Fast 48 dB/s. |
+| **ANALYZER** | Lit when the spectrum is shown behind the curve. |
+| **Output** (knob) | −24 … +12 dB. |
+| **Max Bands** (knob) | 1 … 8: the most bands the fit may use. Fewer bands give a simpler, broader EQ. |
+| **Analyzer: PRE / POST** | The spectrum of the input (before the EQ) or the output (after it). |
+| **Speed: SLOW / MED / FAST** | How fast the spectrum falls: 12 / 24 / 48 dB/s. |
 
 Turning a band's knobs (BANDS pages, Q-Links, automation) changes the EQ directly. Once the knob has been
 still for 0.3 s, the drawing is redrawn from the EQ you hear, so the next stroke edits that curve.
@@ -57,12 +58,13 @@ Drawing, the triggers and the read-only displays are never on a knob.
 | 0 | `output` | Output | yes |
 | 1–2 | `clear`, `undo` | Clear, Undo (self-resetting) | yes |
 | 3 | `maxbands` | Max Bands | yes |
-| 4 | `analyzer` | Analyzer | yes |
-| 5 | `speed` | Speed | yes |
-| 6 | `bypass` | Bypass | yes |
-| 7–8 | `penx`, `peny` | Pen X / Pen Y (the pen pad) | no |
-| 9 | `fitinfo` | Fit (status text) | no |
-| 10–57 | `b{n}on`, `b{n}type`, `b{n}freq`, `b{n}gain`, `b{n}q`, `b{n}slope` | B*n* On … Slope, n = 1…8 | yes |
-| 58–89 | `draw1` … `draw32` | Draw 1 … 32 (the drawing, saved with the project) | no |
-| 90–121 | `spec1` … `spec32` | Spectrum display | no |
-| 122–153 | `resp1` … `resp32` | EQ response display | no |
+| 4 | `analyzer` | Analyzer (on/off) | yes |
+| 5 | `analyze` | Analyze (Pre/Post) | yes |
+| 6 | `speed` | Speed | yes |
+| 7 | `bypass` | Bypass | yes |
+| 8–9 | `penx`, `peny` | Pen X / Pen Y (the pen pad) | no |
+| 10 | `fitinfo` | Fit (status text) | no |
+| 11–58 | `b{n}on`, `b{n}type`, `b{n}freq`, `b{n}gain`, `b{n}q`, `b{n}slope` | B*n* On … Slope, n = 1…8 | yes |
+| 59–90 | `draw1` … `draw32` | Draw 1 … 32 (the drawing, saved with the project) | no |
+| 91–122 | `spec1` … `spec32` | Spectrum display | no |
+| 123–154 | `resp1` … `resp32` | EQ response display | no |

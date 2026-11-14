@@ -14,7 +14,10 @@ EQ tab (back to front):
   * the pen: one transparent XYPad over the graph (Pen X / Pen Y), exactly as in the hardware
     spike. The plugin paints the columns from it and refits the bands as you draw;
   * CLEAR / UNDO / BYPASS: image buttons with the label drawn in (make_text_art.py);
-  * the fit status ("Fit"'s value text), and Output, Max Bands, Analyzer, Speed.
+  * the fit status ("Fit"'s value text);
+  * the bottom row: Output and Max Bands knobs (the SDK kit knob, value label beside it), and
+    PRE | POST and SLOW | MED | FAST switches (radio groups of image buttons). Their captions are
+    drawn into bg.png.
 BANDS 1-4 / BANDS 5-8: one row per band: On, Type, Freq, Gain, Q, Slope.
 """
 import json
@@ -69,6 +72,17 @@ def button(name, handle, r):
                                   'gestureBehaviour': 'Instant'}, r, 'Hide')
 
 
+def knob(name, handle, r):
+    return entry(name, 'Knob', {'version': 3, 'knobType': 'FilmStrip', 'filmStrip': 'knob_uni.png', 'numFrames': 127,
+                                'invert': False, 'dragOrientation': 'Vertical', 'handleName': handle}, r, 'Hide', 'Yes')
+
+
+def segment(name, img, handle, button_id, n, r):
+    return entry(name, 'Button', {'version': 2, 'onImage': img + '_on.png', 'offImage': img + '_off.png',
+                                  'buttonId': button_id, 'numButtonsInGroup': n, 'handleName': handle,
+                                  'gestureBehaviour': 'Instant'}, r, 'Hide')
+
+
 def slider(name, handle, r):
     return entry(name, 'Slider', {'version': 1, 'handleName': handle}, r, 'Hide', 'Yes')
 
@@ -113,8 +127,16 @@ def eq_tab():
     for (pname, caption), x in zip(L.BUTTONS, L.BUTTON_X):
         out.append(button(caption.lower(), P(pname), (x, L.BUTTON_Y, L.BUTTON_W, L.BUTTON_H)))
     out.append(value('fit info', P('Fit'), L.FIT_INFO))
-    out += [slider(n.lower(), P(n), (x, L.CONTROL_Y, L.CONTROL_W, L.CONTROL_H))
-            for n, x in zip(L.CONTROLS, L.CONTROL_X)]
+    for (caption, kind, pname), x in zip(L.BOTTOM, L.BLOCK_X):
+        if kind == 'knob':
+            out.append(knob(caption.lower(), P(pname), (x, L.KNOB_Y, L.KNOB, L.KNOB)))
+            vx, vy, vw, vh = L.KNOB_VALUE
+            out.append(value(caption.lower() + ' value', P(pname), (x + vx, vy, vw, vh), 28, L.TEXT, 'left verticallyCentred'))
+        else:
+            labels, w = L.SWITCHES[pname]
+            for i, lab in enumerate(labels):
+                out.append(segment('%s %s' % (caption.lower(), lab.lower()), 'seg_' + lab.lower(), P(pname), i, len(labels),
+                                   (x + i * (w + 6), L.SEG_Y, w, L.SEG_H)))
     return out
 
 
@@ -131,8 +153,8 @@ def bands_tab(first):
 def main():
     types = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt']
     slopes = ['6 dB', '12 dB', '18 dB', '24 dB', '36 dB', '48 dB']
-    reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Clear', 'Undo', 'Bypass')]
-    reps += [{'key': P('Analyzer'), 'value': ['Off', 'Pre', 'Post']},
+    reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Clear', 'Undo', 'Bypass', 'Analyzer')]
+    reps += [{'key': P('Analyze'), 'value': ['Pre', 'Post']},
              {'key': P('Speed'), 'value': ['Slow', 'Medium', 'Fast']},
              {'key': P('Max Bands'), 'value': [str(k) for k in range(1, 9)]}]
     for b in range(1, 9):
