@@ -115,12 +115,16 @@ private:
                     r = stR[(std::size_t)b][(std::size_t)k].process(d.sec[(std::size_t)k], r);
                 }
             }
-            // Flush denormals in the recursion (cheap insurance on ARM without FTZ).
+        }
+        // Clear tiny filter states (denormal insurance where flush-to-zero is not on). Once per
+        // chunk, not per sample.
+        void flushTiny()
+        {
             for (auto* st : {&stL, &stR})
                 for (auto& band : *st) for (auto& s : band)
                 {
-                    if (std::fabs(s.s1) < 1e-30) s.s1 = 0;
-                    if (std::fabs(s.s2) < 1e-30) s.s2 = 0;
+                    if (std::fabs(s.s1) < 1e-25) s.s1 = 0;
+                    if (std::fabs(s.s2) < 1e-25) s.s2 = 0;
                 }
         }
     };
@@ -133,6 +137,7 @@ private:
     // Once per chunk: start a crossfade if needed, otherwise glide the active bank.
     void control()
     {
+        for (auto& b : banks_) b.flushTiny();
         Bank& cur = banks_[(std::size_t)active_];
         if (xfadePos_ < 0)
         {

@@ -29,11 +29,15 @@ enum P { kOutput, kClear, kUndo, kMaxBands, kAnalyzer, kAnalyze, kSpeed, kBypass
 static constexpr int kCols = 32;
 static int bandOn(int b) { return kBand0 + b * 6; }
 
-static VstIntPtr hostCallback(AEffect*, VstInt32 opcode, VstInt32, VstIntPtr, void* ptr, float)
+static long g_automate[512] = {};
+static long automateTotal(int from, int to) { long s = 0; for (int i = from; i < to; ++i) s += g_automate[i]; return s; }
+
+static VstIntPtr hostCallback(AEffect*, VstInt32 opcode, VstInt32 index, VstIntPtr, void* ptr, float)
 {
     static VstTimeInfo ti{};
     switch (opcode)
     {
+        case audioMasterAutomate: if (index >= 0 && index < 512) ++g_automate[index]; return 0;
         case audioMasterVersion: return 2400;
         case audioMasterGetTime: ti.sampleRate = 44100.0; ti.tempo = 120.0; ti.flags = kVstTempoValid; return (VstIntPtr)&ti;
         case audioMasterGetVendorString: if (ptr) std::strcpy((char*)ptr, "MPC 3"); return 1;
@@ -84,6 +88,27 @@ struct Plug
     std::string text(int i) { char buf[256] = {0}; disp(effGetParamDisplay, i, 0, buf); return buf; }
     float drawDb(int c) { return get(kDraw0 + c) * 36.0f - 18.0f; }
     float respDb(int c) { return get(kResp0 + c) * 36.0f - 18.0f; }
+
+    // A drum-like test signal: a pink-noise burst with a fast decay four times a second, plus a
+    // bass note, so every spectrum column keeps rising and falling as with music.
+    long beatT = 0;
+    void beatBlock(int n = 128)
+    {
+        std::vector<float> l((size_t)n), r((size_t)n);
+        std::normal_distribution<float> g(0.0f, 0.3f);
+        for (int i = 0; i < n; ++i, ++beatT)
+        {
+            const double t = std::fmod((double)beatT / SR, 0.25);
+            const float env = (float)std::exp(-t * 30.0);
+            const float w = g(rng);
+            b0 = 0.99886f * b0 + w * 0.0555179f; b1 = 0.99332f * b1 + w * 0.0750759f;
+            b2 = 0.96900f * b2 + w * 0.1538520f; b3 = 0.86650f * b3 + w * 0.3104856f;
+            l[(size_t)i] = r[(size_t)i] = env * (b0 + b1 + b2 + b3 + w * 0.5f) * 0.3f
+                                         + 0.2f * (float)std::sin(2.0 * M_PI * 55.0 * (double)beatT / SR);
+        }
+        float* io[2] = {l.data(), r.data()};
+        e->processReplacing(e, io, io, n);
+    }
 
     // One block: a sine at hz, or pink noise when hz < 0, or silence when hz == 0.
     float lastPeak = 0.0f, maxStep = 0.0f;
@@ -275,6 +300,18 @@ int main(int argc, char** argv)
             for (int c = 0; c < kCols; ++c) worstSync = std::fmax(worstSync, std::fabs(p.drawDb(c) - p.respDb(c)));
             CHECK(worstSync < 1.0, "the drawing is %.2f dB away from the EQ after a knob edit", worstSync);
             CHECK(p.bandsOn() >= 1, "the knob edit was overwritten by a refit");
+        }
+
+        std::printf("== display updates sent to the MPC with music-like input\n");
+        {
+            p.set(kAnalyzer, 1.0f); p.set(kAnalyze, 0.0f);
+            for (int k = 0; k < (int)(1.0 * SR / 128); ++k) p.beatBlock();
+            const long before = automateTotal(kSpec0, kResp0 + kCols);
+            for (int k = 0; k < (int)(4.0 * SR / 128); ++k) p.beatBlock();
+            const double perSec = (automateTotal(kSpec0, kResp0 + kCols) - before) / 4.0;
+            std::printf("  spectrum + curve: %.0f updates per second\n", perSec);
+            CHECK(perSec <= 400.0, "%.0f display updates per second (budget 360)", perSec);
+            CHECK(perSec > 50.0, "the spectrum hardly moves (%.0f updates per second)", perSec);
         }
 
         std::printf("== the spectrum display follows the input\n");

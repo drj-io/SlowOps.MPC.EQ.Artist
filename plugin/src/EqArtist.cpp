@@ -144,6 +144,7 @@ public:
 
     void process(mpc::ProcessContext& ctx) override
     {
+        mpc::ScopedDenormalsOff noDenormals;   // flush-to-zero: the filters' tails never slow the CPU
         const int n = ctx.numFrames;
         const float* inL = ctx.numInputs > 0 ? ctx.inputs[0] : nullptr;
         const float* inR = ctx.numInputs > 1 ? ctx.inputs[1] : inL;
@@ -212,7 +213,7 @@ private:
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 310;   // 0.3.1
+        info.version = 320;   // 0.3.2
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;
@@ -423,9 +424,16 @@ private:
     void paint(int col, float db) { setPlain(kDraw0 + col, std::clamp(db, -kDrawRangeDb, kDrawRangeDb)); }
 
     // ---- displays -----------------------------------------------------------------------------
+    // The spectrum and the response curve are 64 read-only parameters. Every change is a message
+    // to the MPC's screen, and if they come faster than the screen draws them they queue up and
+    // the picture lags the sound. So each tick sends at most kDisplayBudget of them: the curve
+    // first (it rarely changes), then the biggest spectrum changes, rises before falls (a hit
+    // shows at once); a spectrum bar that has fallen just one step waits for spare budget.
+    static constexpr int kDisplayBudget = 8;   // per tick, at 30 ticks a second: <= 240 per second
+
     void updateDisplays(int analyzer, float secs)
     {
-        static const float kFall[3] = {12.0f, 24.0f, 48.0f};
+        static const float kFall[3] = {20.0f, 40.0f, 80.0f};   // dB per second
         if (analyzer != 0) spectrum_.analyse(kFall[std::clamp(getInt(kSpeed), 0, 2)], secs);
         for (int c = 0; c < kCols; ++c)
         {
@@ -435,7 +443,7 @@ private:
                 v = (spectrum_.columnDb(c) - kSpecBottomDb) / (kSpecTopDb - kSpecBottomDb);
                 v = std::round(std::clamp(v, 0.0f, 1.0f) * (kSpecFrames - 1)) / (float)(kSpecFrames - 1);
             }
-            setValue(kSpec0 + c, v);   // only notifies when the bar height changes
+            want_[(std::size_t)c] = v;
         }
         if (respDirty_)
         {
@@ -446,9 +454,29 @@ private:
             {
                 // Snap to the dot film strip's 1 dB frames.
                 const float d = std::clamp((float)db[c], -kDrawRangeDb, kDrawRangeDb);
-                const float norm = std::round((d + kDrawRangeDb) / (2.0f * kDrawRangeDb) * (kDotFrames - 1)) / (float)(kDotFrames - 1);
-                setValue(kResp0 + c, norm);
+                want_[(std::size_t)(kCols + c)] =
+                    std::round((d + kDrawRangeDb) / (2.0f * kDrawRangeDb) * (kDotFrames - 1)) / (float)(kDotFrames - 1);
             }
+        }
+        for (int sent = 0; sent < kDisplayBudget; ++sent)
+        {
+            int best = -1;
+            float bestScore = 0.0f;
+            for (int k = 0; k < 2 * kCols; ++k)
+            {
+                const int idx = k < kCols ? kSpec0 + k : kResp0 + (k - kCols);
+                const float frames = k < kCols ? (float)(kSpecFrames - 1) : (float)(kDotFrames - 1);
+                const float diff = (want_[(std::size_t)k] - getNormalised(idx)) * frames;   // in frames
+                if (std::fabs(diff) < 0.5f) continue;
+                float score;
+                if (k >= kCols) score = 100.0f + std::fabs(diff);                // the curve: rarely moves, always first
+                else if (diff > 0.0f) score = 2.0f * diff;                       // spectrum rising: a hit shows at once
+                else if (diff <= -1.5f) score = -diff;                           // spectrum falling 2+ steps
+                else score = 0.1f;                                               // a 1-step fall: only with budget to spare
+                if (score > bestScore) { bestScore = score; best = k; }
+            }
+            if (best < 0) break;
+            setValue(best < kCols ? kSpec0 + best : kResp0 + (best - kCols), want_[(std::size_t)best]);
         }
     }
 
@@ -456,6 +484,7 @@ private:
     eq::Spectrum spectrum_;
     eq::FitWorker fit_;
     std::array<double, kCols> colHz_{};
+    std::array<float, 2 * kCols> want_{};   // display targets: spectrum, then response
     int displayAge_ = 0, displayEvery_ = 1470;
     bool respDirty_ = true, drawDirty_ = false, discardFit_ = false, lastBypass_ = false;
 

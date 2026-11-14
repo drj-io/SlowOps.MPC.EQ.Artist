@@ -18,7 +18,7 @@ parameters are only appended. Indices are the order the MPC sees (`plugin/build/
 | **Output** (knob) | −24 … +12 dB. |
 | **Max Bands** (knob) | 1 … 8: the most bands the fit may use. Fewer bands give a simpler, broader EQ. |
 | **Analyzer: PRE / POST** | The spectrum of the input (before the EQ) or the output (after it). |
-| **Speed: SLOW / MED / FAST** | How fast the spectrum falls: 12 / 24 / 48 dB/s. |
+| **Speed: SLOW / MED / FAST** | How fast the spectrum falls: 20 / 40 / 80 dB/s. |
 
 Turning a band's knobs (BANDS pages, Q-Links, automation) changes the EQ directly. Once the knob has been
 still for 0.3 s, the drawing is redrawn from the EQ you hear, so the next stroke edits that curve.
