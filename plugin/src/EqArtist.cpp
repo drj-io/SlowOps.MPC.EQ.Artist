@@ -57,7 +57,8 @@ public:
         kDraw0 = kBand0 + kBands * kPerBand,
         kSpec0 = kDraw0 + kCols,
         kResp0 = kSpec0 + kCols,
-        kNumParams = kResp0 + kCols
+        kDispMode = kResp0 + kCols,   // TEST tab (temporary): Normal / Light / Silent display updates
+        kNumParams
     };
     enum { kOn, kType, kFreq, kGain, kQ, kSlope };
     static int bandParam(int band, int field) { return kBand0 + band * kPerBand + field; }
@@ -105,6 +106,8 @@ public:
             const std::string n = std::to_string(c + 1);
             addDisplay(mpc::floatParam(("resp" + n).c_str(), ("Resp " + n).c_str(), -kDrawRangeDb, kDrawRangeDb, 0.0f, "dB", 1));
         }
+        // Temporary hardware experiment (TEST tab): how the display updates reach the MPC.
+        addDisplay(mpc::choiceParam("dispmode", "Display", {"Normal", "Light", "Silent"}, 0));
         if (numParams() != kNumParams) mpc::log("EqArtist: parameter count mismatch");
         for (int c = 0; c < kCols; ++c) colHz_[(std::size_t)c] = 20.0 * std::pow(1000.0, (c + 0.5) / kCols);
     }
@@ -213,7 +216,7 @@ private:
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 320;   // 0.3.2
+        info.version = 330;   // 0.3.3
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;
@@ -458,7 +461,17 @@ private:
                     std::round((d + kDrawRangeDb) / (2.0f * kDrawRangeDb) * (kDotFrames - 1)) / (float)(kDotFrames - 1);
             }
         }
-        for (int sent = 0; sent < kDisplayBudget; ++sent)
+        // TEST tab: Light = a quarter of the budget; Silent = write every value without telling
+        // the host (does the MPC's screen re-read parameter values on its own?).
+        const int mode = getInt(kDispMode);
+        if (mode == 2)
+        {
+            for (int k = 0; k < 2 * kCols; ++k)
+                setNormalised(k < kCols ? kSpec0 + k : kResp0 + (k - kCols), want_[(std::size_t)k]);
+            return;
+        }
+        const int budget = mode == 1 ? 2 : kDisplayBudget;
+        for (int sent = 0; sent < budget; ++sent)
         {
             int best = -1;
             float bestScore = 0.0f;

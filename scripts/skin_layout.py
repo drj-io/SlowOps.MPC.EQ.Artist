@@ -74,7 +74,9 @@ SEG_Y, SEG_H = 530, 40
 SWITCHES = {                                  # parameter: (captions, segment width)
     'Analyze': (['PRE', 'POST'], 130),
     'Speed': (['SLOW', 'MED', 'FAST'], 92),
+    'Display': (['NORMAL', 'LIGHT', 'SILENT'], 200),   # TEST tab (temporary)
 }
+TEST_SWITCH_Y = 120
 BOTTOM = [('OUTPUT', 'knob', 'Output'), ('MAX BANDS', 'knob', 'Max Bands'),
           ('ANALYZER', 'switch', 'Analyze'), ('SPEED', 'switch', 'Speed')]
 

@@ -154,7 +154,8 @@ def main():
     types = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt']
     slopes = ['6 dB', '12 dB', '18 dB', '24 dB', '36 dB', '48 dB']
     reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Clear', 'Undo', 'Bypass', 'Analyzer')]
-    reps += [{'key': P('Analyze'), 'value': ['Pre', 'Post']},
+    reps += [{'key': P('Display'), 'value': ['Normal', 'Light', 'Silent']},
+             {'key': P('Analyze'), 'value': ['Pre', 'Post']},
              {'key': P('Speed'), 'value': ['Slow', 'Medium', 'Fast']},
              {'key': P('Max Bands'), 'value': [str(k) for k in range(1, 9)]}]
     for b in range(1, 9):
@@ -163,12 +164,16 @@ def main():
                  {'key': P('B%d Slope' % b), 'value': slopes}]
 
     eq, b14, b58 = eq_tab(), bands_tab(0), bands_tab(4)
+    # TEST (temporary hardware experiment): the spectrum under the three display-update modes.
+    labels, w = L.SWITCHES['Display']
+    test = [segment('display %s' % lab.lower(), 'seg_' + lab.lower(), P('Display'), i, len(labels),
+                    (32 + i * (w + 12), L.TEST_SWITCH_Y, w, 56)) for i, lab in enumerate(labels)]
     tui = {'pageData': {
         'version': 1,
         'componentDefinitions': {'version': 2, 'importFiles': [], 'localComponentDefinitions': []},
         'replacementStrings': reps,
         'info': {'version': 1, 'type': 'CompleteDescription'},
-        'tabs': [tab('EQ', 0, eq), tab('BANDS 1-4', 1, b14), tab('BANDS 5-8', 2, b58)]}}
+        'tabs': [tab('EQ', 0, eq), tab('BANDS 1-4', 1, b14), tab('BANDS 5-8', 2, b58), tab('TEST', 3, test)]}}
 
     # Q-Links (4 x 4, Q-Link 13 top left). EQ tab and Program mode: Freq / Gain of all 8 bands,
     # two bands per row. BANDS tabs: one band per row: Freq, Gain, Q, Type.
@@ -199,7 +204,8 @@ def main():
               'Screen Mode Q-Links': {'version': 4, 'map': [
                   {'Tab': 1, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(eq_q)},
                   {'Tab': 2, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(0))},
-                  {'Tab': 3, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(4))}]},
+                  {'Tab': 3, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(4))},
+                  {'Tab': 4, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(eq_q)}]},
               'Program Mode Q-Links': full(prog)}
 
     os.makedirs(OUT, exist_ok=True)

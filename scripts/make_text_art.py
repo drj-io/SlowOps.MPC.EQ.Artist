@@ -80,8 +80,9 @@ def main():
         print('  %s_on.png / %s_off.png' % (label.lower(), label.lower()))
     for param, (labels, w) in L.SWITCHES.items():
         for label in labels:
-            face(label, L.PANEL, 0.9, L.GRID_HI, L.TEXT_DIM, w, L.SEG_H).save(os.path.join(OUT, 'seg_%s_off.png' % label.lower()))
-            face(label, L.GLOW, 0.55, L.CURVE, (255, 255, 255), w, L.SEG_H).save(os.path.join(OUT, 'seg_%s_on.png' % label.lower()))
+            h = 56 if param == 'Display' else L.SEG_H
+            face(label, L.PANEL, 0.9, L.GRID_HI, L.TEXT_DIM, w, h).save(os.path.join(OUT, 'seg_%s_off.png' % label.lower()))
+            face(label, L.GLOW, 0.55, L.CURVE, (255, 255, 255), w, h).save(os.path.join(OUT, 'seg_%s_on.png' % label.lower()))
             print('  seg_%s_on.png / seg_%s_off.png' % (label.lower(), label.lower()))
 
 
