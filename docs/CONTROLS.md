@@ -7,8 +7,8 @@ parameters are only appended. Indices are the order the MPC sees (`plugin/build/
 
 | Control | What it does |
 |---|---|
-| *the graph* | Drag on it to draw. The sound follows as you draw: the drawing is refitted to up to *Max Bands* real bands whenever it changes, and each new set of bands is switched in with a 30 ms crossfade (no click). Columns your finger skips are filled in; lifting for 0.15 s ends the stroke. |
-| *bright dots* | The EQ you hear. |
+| *the graph* | Drag on it to draw. The sound follows your finger at once: while you draw you hear the live EQ, 32 bells solved straight from the drawing. Meanwhile the drawing is fitted to up to *Max Bands* real bands; when the stroke ends (0.15 s without movement) and the fit has caught up, the sound crossfades to the bands (30 ms, no click). Columns your finger skips are filled in. |
+| *bright dots* | The EQ you hear (the live EQ while drawing, then the fitted bands). |
 | *small rings* | Your drawing. A dot inside a ring means the EQ is where you drew it. |
 | *status, top right* | How many bands the fit used and how far they are from the drawing (RMS dB), or **BYPASSED**. |
 | **CLEAR** | Flat drawing, no bands. |
@@ -26,7 +26,27 @@ still for 0.3 s, the drawing is redrawn from the EQ you hear, so the next stroke
 The graph runs from 20 Hz to 20 kHz (log scale) and ±18 dB. It shows 32 columns of about 1/3 octave each.
 The spectrum reads the total level in each column: a full-scale sine reads 0 dB, and pink noise reads flat.
 
-## The bands
+## PARA tab (the first tab; UI test: its bands are silent)
+
+An interactive parametric EQ. **For now its bands do not change the sound** (they are separate test bands;
+wiring them to the EQ comes next).
+
+| Control | What it does |
+|---|---|
+| *band nodes* | Touch near a node (about 44 px) to grab and select it, then drag: left/right is frequency, up/down is gain. The node keeps its offset from your finger, so it doesn't jump. Cuts and notches only move left/right. A pause of 0.25 s ends a touch (the MPC sends no "lift"). Touching empty space does nothing |
+| *white curve* | The **selected band's own curve**, over a flat fill in the band's colour (it fades out where the band is flat at 0 dB). With **NONE** selected: the combined curve |
+| *grey line* | The combined response of all shown bands, behind |
+| **DOTS / LINE** (top) | STYLE: both curves as dots (the default) or as smooth lines |
+| **ANALYZER** (top) | The spectrum behind the curves on / off (the same switch as DRAW's ANALYZER) |
+| **NONE**, **1–8** (top) | Select no band (only the combined curve) or a band (each in its colour) |
+| *status* | The selected band: type, frequency, gain, Q (or slope for cuts) |
+| **BANDS − / +** | **+** adds a band (flat, at its default frequency) and selects it; **−** removes the selected band (the bands above it move down a place) and selects none. 1–8 bands, starting at 2 |
+| **TYPE** | BELL, LO SH, HI SH, LO CUT, HI CUT, NOTCH for the selected band |
+| **Q**, **SLOPE** (knobs) | The selected band's Q, and its slope (cuts only) |
+
+Q-Links on PARA: Q-Link 13 to 16 = the selected band's Freq, Gain, Q, Slope.
+
+## The bands (DRAW)
 
 There is one page. The fit chooses each band's type, frequency, gain, Q and slope (up to *Max Bands*
 of them); the Q-Links turn the Freq and Gain of bands 1–8, and every band parameter can be automated.

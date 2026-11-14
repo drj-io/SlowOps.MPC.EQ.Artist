@@ -8,10 +8,13 @@
 //        (out_dir gets draw-demo.wav: pink noise, flat for 2 s, then with the drawn EQ)
 
 #include "mpc_vst2_abi.h"
+#include "slowops/eqartist/Filters.hpp"
+#include "slowops/eqartist/LineStrip.hpp"
 
 #include <dlfcn.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -25,7 +28,14 @@ static int g_fail = 0, g_pass = 0;
 
 // Parameter indices (plugin/src/EqArtist.cpp).
 enum P { kOutput, kClear, kUndo, kMaxBands, kAnalyzer, kAnalyze, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
-         kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kNum = kResp0 + 32 };
+         kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kPara0 = kResp0 + 32,
+         // PARA block (plugin/src/ParaPage.hpp)
+         kPBands = kPara0, kPSel, kPPenX, kPPenY, kPInfo, kPSelNodeX, kPSelNodeY, kPSelType, kPSelQ, kPSelSlope,
+         kPSelFreq, kPSelGain, kPBand0, kPNode0 = kPBand0 + 40, kPLine0 = kPNode0 + 16, kPShade0 = kPLine0 + 76,
+         kPBgLine0 = kPShade0 + 64, kPBgDot0 = kPBgLine0 + 76, kPStyle = kPBgDot0 + 64, kPAdd, kPRemove, kPFill0, kNum = kPFill0 + 76 };
+static float selNorm(int sel) { return sel / 8.0f; }          // Para Sel: 0 = none, 1..8 = band
+static int selOf(float norm) { return (int)std::lround(norm * 8.0f); }
+static int pband(int b, int f) { return kPBand0 + b * 5 + f; }   // f: 0 Type, 1 Freq, 2 Gain, 3 Q, 4 Slope
 static constexpr int kCols = 32;
 static int bandOn(int b) { return kBand0 + b * 6; }
 
@@ -235,6 +245,15 @@ int main(int argc, char** argv)
         p.run(2.0, -1.0);   // pink noise, flat
         p.run(0.3);         // a pause: the next touch is a new stroke
         penDraw(p);
+        {
+            // Right away, before the fitter has had time: the live EQ already sounds like the drawing.
+            const auto t0 = std::chrono::steady_clock::now();
+            const double g200 = p.gainDb(200.0), g3k = p.gainDb(3000.0);
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            std::printf("  right after the stroke (%.1f ms of real time): %.2f dB at 200 Hz, %.2f dB at 3 kHz (drew %.2f / %.2f)\n",
+                        ms, g200, g3k, drawnDb(200.0), drawnDb(3000.0));
+            CHECK(std::fabs(g200 - drawnDb(200.0)) < 1.0 && std::fabs(g3k - drawnDb(3000.0)) < 1.0, "the sound did not follow the stroke at once");
+        }
         p.settle(1.0, -1.0);
         p.run(2.0, -1.0);   // pink noise, EQ'd
         p.recording = false;
@@ -312,6 +331,148 @@ int main(int argc, char** argv)
             std::printf("  spectrum + curve: %.0f updates per second\n", perSec);
             CHECK(perSec <= 400.0, "%.0f display updates per second (budget 360)", perSec);
             CHECK(perSec > 50.0, "the spectrum hardly moves (%.0f updates per second)", perSec);
+        }
+
+        std::printf("== PARA: touch a node, drag it; far touches do nothing; the sound never changes\n");
+        {
+            namespace eq = slowops::eqartist;
+            auto hz = [&](int b) { return eq::GraphMap::xToHz(p.get(pband(b, 1))); };   // Freq is a log 20 Hz..20 kHz parameter
+            auto gainDbOf = [&](int b) { return p.get(pband(b, 2)) * 36.0 - 18.0; };
+            p.run(0.4);
+            CHECK(std::lround(p.get(kPBands) * 7) + 1 == 2, "PARA starts with %ld bands, expected 2", std::lround(p.get(kPBands) * 7) + 1);
+            const double audioBefore = p.gainDb(1000.0);
+            // Node 2 (2.5 kHz, -3 dB by default) on the graph:
+            const double n2x = p.get(kPNode0 + 2), n2y = p.get(kPNode0 + 3);
+            CHECK(std::fabs(n2x - eq::GraphMap::hzToX(2500.0)) < 0.002 && std::fabs(n2y - eq::GraphMap::dbToY(-3.0)) < 0.002,
+                  "node 2 at %.3f / %.3f", n2x, n2y);
+            // Touch 15 px right of node 2 (after a pause: a new touch); then drag 0.1 to the right and up.
+            const double f2 = hz(1), g2 = gainDbOf(1);
+            p.set(kPPenX, (float)(n2x + 15.0 / 1216.0)); p.set(kPPenY, (float)n2y); p.block(0.0);
+            CHECK(selOf(p.get(kPSel)) == 2, "touching node 2 selected band %d", selOf(p.get(kPSel)));
+            CHECK(std::fabs(hz(1) / f2 - 1.0) < 0.01 && std::fabs(gainDbOf(1) - g2) < 0.05, "grabbing made the node jump");
+            p.set(kPPenX, (float)(n2x + 15.0 / 1216.0 + 0.1)); p.set(kPPenY, (float)(n2y + 0.2)); p.block(0.0);
+            const double wantHz = eq::GraphMap::xToHz(n2x + 0.1), wantDb = eq::GraphMap::yToDb(n2y + 0.2);
+            CHECK(std::fabs(hz(1) / wantHz - 1.0) < 0.01, "drag: %.0f Hz, expected %.0f", hz(1), wantHz);
+            CHECK(std::fabs(gainDbOf(1) - wantDb) < 0.1, "drag: %.2f dB, expected %.2f", gainDbOf(1), wantDb);
+            // The proxies follow the selected band.
+            p.run(0.05);
+            CHECK(std::fabs(p.get(kPSelFreq) - p.get(pband(1, 1))) < 1e-6 && std::fabs(p.get(kPSelGain) - p.get(pband(1, 2))) < 1e-6,
+                  "Sel Freq / Gain do not follow band 2");
+            // A far touch after a pause: nothing moves.
+            p.run(0.4);
+            const float before1 = p.get(pband(0, 1)), before2 = p.get(pband(1, 1));
+            p.set(kPPenX, 0.97f); p.set(kPPenY, 0.05f); p.block(0.0);
+            p.set(kPPenX, 0.90f); p.set(kPPenY, 0.10f); p.block(0.0);
+            CHECK(p.get(pband(0, 1)) == before1 && p.get(pband(1, 1)) == before2, "a touch on empty space moved a band");
+            // Turning Sel Q (the Q knob) writes the selected band's Q.
+            p.set(kPSelQ, 0.8f); p.block(0.0); p.block(0.0);
+            CHECK(std::fabs(p.get(pband(1, 3)) - 0.8f) < 1e-6, "Sel Q did not reach band 2 (%.3f)", p.get(pband(1, 3)));
+            // Selecting band 1 loads its values into the proxies.
+            p.set(kPSel, selNorm(1)); p.block(0.0); p.block(0.0);
+            CHECK(std::fabs(p.get(kPSelFreq) - p.get(pband(0, 1))) < 1e-6, "selecting band 1 did not load its frequency");
+            CHECK(p.get(kPStyle) < 0.5f, "DOTS is not the default style");
+            p.set(kPStyle, 1.0f);   // LINE, for the line checks below
+            // The white line is the selected band's own curve; the grey one behind is the bands' sum.
+            // (Both lines and the shading change: about 370 columns at up to 480 per second.)
+            p.run(1.2);
+            eq::BandParams b1, b2;
+            b1.on = b2.on = true; b1.type = b2.type = eq::BandType::Bell;
+            b1.freq = hz(0); b1.gainDb = gainDbOf(0); b1.q = 0.1 * std::pow(180.0, p.get(pband(0, 3)));
+            b2.freq = hz(1); b2.gainDb = gainDbOf(1); b2.q = 0.1 * std::pow(180.0, p.get(pband(1, 3)));
+            float want[76], wantBg[76];
+            eq::LineStrip76::encode([&](double f) { return eq::analogDb(b1, f); }, want);   // band 1 is selected
+            eq::LineStrip76::encode([&](double f) { return eq::analogDb(b1, f) + eq::analogDb(b2, f); }, wantBg);
+            int off = 0, offBg = 0;
+            for (int c = 0; c < 76; ++c)
+            {
+                off += std::fabs(p.get(kPLine0 + c) - want[c]) > 1e-4f;
+                offBg += std::fabs(p.get(kPBgLine0 + c) - wantBg[c]) > 1e-4f;
+            }
+            CHECK(off == 0, "%d of 76 white-line columns differ from the selected band's curve", off);
+            // The fill: band 1's colour (frames 0..144), flat at band 1's response at each column centre.
+            int fillOff = 0;
+            for (int c = 0; c < 76; ++c)
+            {
+                const int idx = (int)std::lround(p.get(kPFill0 + c) * (8 * 145 - 1));
+                const double centre = std::fmax(-18.0, std::fmin(18.0, eq::analogDb(b1, eq::GraphMap::xToHz((c + 0.5) / 76.0))));
+                if (idx / 145 != 0 || std::fabs((idx % 145) * 0.25 - 18.0 - centre) > 0.13) ++fillOff;
+            }
+            CHECK(fillOff == 0, "%d of 76 fill columns are not band 1's colour at its curve", fillOff);
+            CHECK(offBg == 0, "%d of 76 grey-line columns differ from the bands' sum", offBg);
+            // DOTS style: the grey dots follow the sum too.
+            p.set(kPStyle, 0.0f); p.run(1.2);   // DOTS
+            int dotOff = 0;
+            for (int c = 0; c < 64; ++c)
+            {
+                double ext = 0;
+                for (int s2 = 0; s2 < 16; ++s2)
+                {
+                    const double f = eq::GraphMap::xToHz((c + (s2 + 0.5) / 16.0) / 64.0);
+                    const double d = eq::analogDb(b1, f) + eq::analogDb(b2, f);
+                    if (std::fabs(d) > std::fabs(ext)) ext = d;
+                }
+                dotOff += std::fabs(p.get(kPBgDot0 + c) - (float)(std::round((ext + 18.0) / 36.0 * 72.0) / 72.0)) > 1e-4f;
+            }
+            CHECK(dotOff == 0, "%d of 64 grey dots differ from the bands' sum", dotOff);
+            p.set(kPStyle, 1.0f);   // back to LINE
+            // NONE: the white front curve becomes the combined one.
+            p.set(kPSel, selNorm(0)); p.run(1.2);
+            int offNone = 0;
+            for (int c = 0; c < 76; ++c) offNone += std::fabs(p.get(kPLine0 + c) - wantBg[c]) > 1e-4f;
+            CHECK(offNone == 0, "with NONE selected, %d front-curve columns differ from the combined curve", offNone);
+            CHECK(p.text(kPInfo).find("none selected") != std::string::npos, "status with NONE reads '%s'", p.text(kPInfo).c_str());
+            // ...and in DOTS the white dots are the combined curve too (dots are only sent while DOTS shows).
+            p.set(kPStyle, 0.0f); p.run(1.2);
+            int dotNone = 0;
+            for (int c = 0; c < 64; ++c) dotNone += std::fabs(p.get(kPShade0 + c) - p.get(kPBgDot0 + c)) > 1e-4f;
+            CHECK(dotNone == 0, "with NONE selected, %d white dots differ from the combined curve", dotNone);
+            p.set(kPStyle, 1.0f);
+            p.set(kPSel, selNorm(1)); p.run(0.2);
+            // Bands = 1: band 2 leaves the curve.
+            p.set(kPBands, 0.0f); p.run(0.5);
+            double l, r;
+            const int col2 = (int)(eq::GraphMap::hzToX(hz(1)) * 76);
+            eq::LineStrip76::decode(p.get(kPBgLine0 + col2), l, r);
+            CHECK(std::fabs(l - eq::analogDb(b1, eq::GraphMap::xToHz((double)col2 / 76))) < 0.3, "band 2 still in the curve with Bands = 1");
+            CHECK(selOf(p.get(kPSel)) == 1, "Sel Band not clamped to the band count");
+            p.set(kPBands, 1.0f / 7.0f); p.run(0.1);
+            // + adds band 3 (at 400 Hz, flat) and selects it; - removes the selected band and selects none;
+            // removing band 1 moves band 2 down into its place.
+            p.set(kPAdd, 1.0f); p.block(0.0); p.block(0.0);
+            CHECK(std::lround(p.get(kPBands) * 7) + 1 == 3 && selOf(p.get(kPSel)) == 3, "+ did not add and select band 3");
+            CHECK(std::fabs(hz(2) - 400.0) < 1.0 && std::fabs(gainDbOf(2)) < 0.05, "new band 3 at %.0f Hz %.2f dB", hz(2), gainDbOf(2));
+            CHECK(p.get(kPAdd) < 0.5f, "+ did not reset itself");
+            p.set(kPRemove, 1.0f); p.block(0.0); p.block(0.0);
+            CHECK(std::lround(p.get(kPBands) * 7) + 1 == 2 && selOf(p.get(kPSel)) == 0, "- did not remove band 3 / select none");
+            p.set(kPRemove, 1.0f); p.block(0.0);   // none selected: nothing to remove
+            CHECK(std::lround(p.get(kPBands) * 7) + 1 == 2, "- with NONE selected removed a band");
+            const float band2freq = p.get(pband(1, 1));
+            p.set(kPSel, selNorm(1)); p.block(0.0);
+            p.set(kPRemove, 1.0f); p.block(0.0); p.block(0.0);
+            CHECK(std::lround(p.get(kPBands) * 7) + 1 == 1 && p.get(pband(0, 1)) == band2freq, "removing band 1 did not move band 2 down");
+            p.set(kPAdd, 1.0f); p.block(0.0); p.block(0.0);   // back to two bands
+            // None of this touched the sound.
+            CHECK(std::fabs(p.gainDb(1000.0) - audioBefore) < 0.01, "PARA changed the sound (%.2f -> %.2f dB)", audioBefore, p.gainDb(1000.0));
+        }
+
+        std::printf("== PARA: display updates while dragging stay within the budget\n");
+        {
+            long before = automateTotal(kPLine0, kPBgDot0 + 64);
+            const double n1x = p.get(kPNode0 + 0), n1y = p.get(kPNode0 + 1);
+            p.run(0.4);
+            p.set(kPPenX, (float)n1x); p.set(kPPenY, (float)n1y); p.block(0.0);
+            const auto t0 = std::chrono::steady_clock::now();
+            int blocks = 0;
+            for (int k = 0; k < 60; ++k)   // a 2-second drag across the graph
+            {
+                p.set(kPPenX, (float)(0.1 + 0.8 * k / 59.0)); p.set(kPPenY, (float)(0.5 + 0.3 * std::sin(k * 0.2)));
+                for (int b = 0; b < (int)(SR / 30 / 128); ++b) { p.block(0.0); ++blocks; }
+            }
+            const double usPerBlock = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / blocks;
+            std::printf("  plugin time per 128-sample block while dragging: %.1f us (desktop; a block lasts 2902 us)\n", usPerBlock);
+            const double perSec = (automateTotal(kPLine0, kPBgDot0 + 64) - before) / 2.0;
+            std::printf("  band line + shading + grey line: %.0f updates per second while dragging (budget 16 x 30 = 480)\n", perSec);
+            CHECK(perSec > 100 && perSec <= 500, "%.0f updates per second while dragging", perSec);
         }
 
         std::printf("== the spectrum display follows the input\n");

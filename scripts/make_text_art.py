@@ -35,8 +35,8 @@ def face(label, fill, fill_a, edge, text, w=L.BUTTON_W, h=L.BUTTON_H):
     return img.resize((w, h), Image.LANCZOS)
 
 
-def axis_labels():
-    path = os.path.join(OUT, 'bg.png')
+def axis_labels(name='bg.png'):
+    path = os.path.join(OUT, name)
     img = Image.open(path).convert('RGBA')
     big = img.resize((img.width * SS, img.height * SS), Image.NEAREST)
     layer = Image.new('RGBA', big.size, (0, 0, 0, 0))
@@ -53,7 +53,7 @@ def axis_labels():
         d.text(((gx + 6) * SS - box[0], (L.db_y(db) - 20) * SS - box[1]), s, font=font, fill=L.TEXT_DIM + (255,))
     small = layer.resize(img.size, Image.LANCZOS)
     Image.alpha_composite(img, small).save(path)
-    print('  bg.png: axis labels')
+    print('  %s: axis labels' % name)
 
 
 def captions():
@@ -72,6 +72,7 @@ def captions():
 
 def main():
     axis_labels()
+    axis_labels('bg_para.png')
     captions()
     for name, label in L.BUTTONS:
         hot = L.WARN if name == 'Bypass' else L.GLOW

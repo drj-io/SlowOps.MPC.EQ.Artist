@@ -89,7 +89,7 @@ class Canvas:
         print('  %-14s %5d x %-6d %7.1f KB' % (name, self.w, self.h, len(png) / 1024.0))
 
 
-def background():
+def background(name='bg.png'):
     c = Canvas(L.TAB_W, L.TAB_H, L.BG + (255,))
     gx, gy, gw, gh = L.GRAPH
     c.rect(gx, gy, gw, gh, L.PANEL)
@@ -103,7 +103,7 @@ def background():
     for x, y, w, h in ((gx - 1, gy - 1, gw + 2, 1), (gx - 1, gy + gh, gw + 2, 1),
                        (gx - 1, gy - 1, 1, gh + 2), (gx + gw, gy - 1, 1, gh + 2)):
         c.rect(x, y, w, h, L.GRID_HI)
-    c.save('bg.png')
+    c.save(name)
 
 
 def spec_bar():
@@ -152,6 +152,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     print('skin art -> %s' % OUT)
     background()
+    background('bg_para.png')   # PARA: the same graph
     spec_bar()
     dot()
     puck()

@@ -77,3 +77,43 @@ SWITCHES = {                                  # parameter: (captions, segment wi
 }
 BOTTOM = [('OUTPUT', 'knob', 'Output'), ('MAX BANDS', 'knob', 'Max Bands'),
           ('ANALYZER', 'switch', 'Analyze'), ('SPEED', 'switch', 'Speed')]
+
+
+# ---- PARA tab (scripts/make_para_art.py, gen_skins.py; must match plugin/src/ParaPage.hpp and
+# core/include/slowops/eqartist/LineStrip.hpp) ---------------------------------------------------------
+PARA_COLOURS = [(255, 110, 110), (255, 165, 72), (240, 214, 80), (110, 214, 130),
+                (70, 206, 200), (96, 150, 255), (175, 125, 255), (255, 110, 200)]   # bands 1..8
+PARA_BANDS = 8
+# The PARA line (LineStrip76): 76 columns of 16 px, 0.25 dB vertices, 25 rises (up to 10 dB per column).
+LINE_COLS, LINE_LEVELS, LINE_STEP_DB = 76, 145, 0.25
+LINE_RISES = [-40, -32, -24, -20, -16, -12, -8, -6, -4, -3, -2, -1, 0, 1, 2, 3, 4, 6, 8, 12, 16, 20, 24, 32, 40]
+LINE_TILES = 3                                     # 144 px tiles: 3 per column (6 swamped the MPC: no dragging in LINE)
+SHADE_COLS, SHADE_FRAMES = 64, 73                  # DOTS style columns
+FILL_LEVELS = 145                                  # band fill: 0.25 dB heights, one frame set per band colour
+NODE, RING, PEN = 36, 56, 40
+NONE_BTN = (32, 5, 80, 38)
+BAND_BTN = (120, 5, 58, 38, 6)                      # x0, y, w, h, gap
+PARA_INFO = (944, 5, 304, 38)
+PARA_ANALYZER = (816, 5, 118, 38)               # the spectrum on/off (the same switch as DRAW's ANALYZER)
+STYLE_SEGS = (646, 5, 78, 38, 6)                # x0, y, w, h, gap: STYLE DOTS | LINE
+STYLE_LABELS = ['DOTS', 'LINE']
+GREY = (150, 142, 170)                           # the combined curve, behind
+PARA_CAPTION_Y = 492
+PARA_KNOBS = {'Sel Q': (800, 'Q'), 'Sel Slope': (1010, 'SLOPE')}
+BANDS_CAPTION_X = 32
+MINUS_BTN = (32, 538, 52, 46)
+BANDS_COUNT = (90, 538, 44, 46)
+PLUS_BTN = (140, 538, 52, 46)
+PARA_KNOB_Y, PARA_VALUE_DX, PARA_VALUE_W = 520, 96, 130
+TYPE_LABELS = ['BELL', 'LO SH', 'HI SH', 'LO CUT', 'HI CUT', 'NOTCH']
+TYPE_SEGS = (210, 540, 88, 44, 6)                  # x0, y, w, h, gap
+STAMP_Y = 604
+
+
+def node_pad(puck):
+    """Bounds of an XYPad whose puck centre must cover the graph: the full width, and vertically the
+    curve's +18..-18 dB lines (the DRAW_MARGIN inset), overhanging by half a puck."""
+    gx, gy, gw, gh = GRAPH
+    o = puck / 2.0
+    top, bot = db_y(DRAW_RANGE_DB), db_y(-DRAW_RANGE_DB)
+    return (gx - o, top - o, gw + 2 * o, bot - top + 2 * o)

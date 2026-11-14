@@ -1,0 +1,16 @@
+{
+  "name": "Curve UI Test",
+  "manufacturer": "Slow Ops",
+  "version": "0.5.1",
+  "format": "vst2",
+  "kind": "effect",
+  "uid": "SoCt",
+  "numInputs": 2,
+  "numOutputs": 2,
+  "category": "Effect",
+  "file32": "VST/curve-ui-test-arm32.so",
+  "file64": "VST/curve-ui-test-arm64.so",
+  "description": "Diagnostic test plugin for touchscreen widgets (XYPad). Audio passes through.",
+  "author": "Slow Ops",
+  "license": "MIT"
+}

@@ -7,9 +7,14 @@
 //     new set of bands (forceCrossfade(), used by Apply and Undo), is handled by building the
 //     new settings in a second filter bank and crossfading to it over 30 ms.
 //   * Bypass and Output are smoothed too.
+//
+// Beside the bands runs the live EQ (LiveEq: 32 bells that follow the drawing at once). setLive()
+// crossfades (30 ms) between the two: live while you draw, the fitted bands once the fit has
+// caught up. The live EQ costs nothing while it is off.
 #pragma once
 
 #include "Filters.hpp"
+#include "LiveEq.hpp"
 
 #include <algorithm>
 #include <array>
@@ -23,12 +28,16 @@ public:
     static constexpr int kNumBands = 8;
     static constexpr int kChunk = 32;
 
-    void prepare(double sampleRate)
+    // colHz: the drawing's column centres (LiveEq::kBands of them), for the live EQ.
+    void prepare(double sampleRate, const double* colHz)
     {
         sampleRate_ = sampleRate;
+        live_.prepare(sampleRate, colHz);
+        liveMix_ = liveOn_ ? 1.0 : 0.0;
         glide_ = 1.0 - std::exp(-(double)kChunk / (0.02 * sampleRate));
         xfadeLen_ = std::max(1, (int)(0.03 * sampleRate));
         gainStep_ = 1.0 / (0.02 * sampleRate);
+        liveStep_ = 1.0 / (0.03 * sampleRate);
         for (auto& b : banks_) { b.current = target_; b.redesign(sampleRate_); b.reset(); }
         active_ = 0;
         xfadePos_ = -1;
@@ -41,7 +50,18 @@ public:
     void setOutputDb(double db) { outTarget_ = std::pow(10.0, db / 20.0); }
     void setBypass(bool b) { bypass_ = b; }
     void forceCrossfade() { forceXfade_ = true; }
-    void reset() { for (auto& b : banks_) b.reset(); }
+    void reset() { for (auto& b : banks_) b.reset(); live_.reset(); }
+
+    // The live EQ: setLiveDrawing() solves its gains from the drawing (dB at the column centres);
+    // setLive(true) crossfades the sound to it, setLive(false) back to the bands.
+    void setLiveDrawing(const double* drawDb) { live_.setDrawing(drawDb); }
+    void setLive(bool on)
+    {
+        if (on && !liveOn_ && liveMix_ == 0.0) live_.reset();   // starting from silence: no stale tail
+        liveOn_ = on;
+    }
+    bool live() const { return liveOn_; }
+    double liveResponseDb(int column) const { return live_.responseDb(column); }
 
     // In place is fine (l/r may alias the outputs).
     void process(const float* inL, const float* inR, float* outL, float* outR, int n)
@@ -50,6 +70,8 @@ public:
         {
             const int len = std::min(kChunk, n - start);
             control();
+            const bool runLive = liveOn_ || liveMix_ > 0.0;
+            if (runLive) { live_.control(); live_.flushTiny(); }
             for (int i = start; i < start + len; ++i)
             {
                 const double dl = inL[i], dr = inR[i];
@@ -63,6 +85,15 @@ public:
                     l = l * (1.0 - t) + l2 * t;
                     r = r * (1.0 - t) + r2 * t;
                     if (++xfadePos_ >= xfadeLen_) { active_ = 1 - active_; xfadePos_ = -1; }
+                }
+                // Live EQ crossfade.
+                if (runLive)
+                {
+                    liveMix_ += std::clamp((liveOn_ ? 1.0 : 0.0) - liveMix_, -liveStep_, liveStep_);
+                    double ll = dl, lr = dr;
+                    live_.run(ll, lr);
+                    l += (ll - l) * liveMix_;
+                    r += (lr - r) * liveMix_;
                 }
                 // Bypass and Output ramps.
                 const double wetTarget = bypass_ ? 0.0 : 1.0;
@@ -182,6 +213,9 @@ private:
     int active_ = 0, xfadePos_ = -1, xfadeLen_ = 1323;
     bool forceXfade_ = false, bypass_ = false;
     double outTarget_ = 1.0, outGain_ = 1.0, wet_ = 1.0;
+    LiveEq live_;
+    bool liveOn_ = false;
+    double liveMix_ = 0.0, liveStep_ = 1e-3;
 };
 
 } // namespace slowops::eqartist

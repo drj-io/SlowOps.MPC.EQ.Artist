@@ -2,14 +2,15 @@
 
 An EQ for the Akai MPC standalone (MPC OS 3.10.1+, insert effect) that you draw:
 
-1. Drag your finger across the graph, over a live spectrum of the track. The sound follows as you draw:
-   the drawing is continuously fitted to up to 8 real parametric bands (bell, shelf, cut, notch, tilt),
+1. Drag your finger across the graph, over a live spectrum of the track. The sound follows your finger at
+   once (a 32-band live EQ solved straight from the drawing), and when you stop, the drawing has been fitted
+   to up to 8 real parametric bands (bell, shelf, cut, notch, tilt),
    using zero-latency filters that follow their analog shapes, so high bands keep their width instead of
    narrowing towards 20 kHz.
 2. **UNDO** takes back a stroke; **CLEAR** goes back to flat.
 3. Fine-tune each band's Freq and Gain with the Q-Links; the drawing follows.
 
-**Status: 0.4.0.** Tested in the desktop simulator, and the drawing surface on an MPC Live III.
+**Status: 0.4.1.** Tested in the desktop simulator, and the drawing surface on an MPC Live III.
 Controls: [docs/CONTROLS.md](docs/CONTROLS.md). How the drawing surface was chosen (the pen won):
 [docs/SPIKE.md](docs/SPIKE.md).
 
@@ -17,7 +18,7 @@ Controls: [docs/CONTROLS.md](docs/CONTROLS.md). How the drawing surface was chos
 
 | Path | What |
 |---|---|
-| `core/include/slowops/eqartist/` | Header-only DSP, standard library only (no plugin SDK): `Filters` (band shapes, analog-matched zero-latency biquads), `EqEngine` (8 bands, glides, click-free crossfades), `CurveFit` (drawing → bands), `FitWorker` (runs the fit off the audio thread), `Spectrum` + `Fft` (analyser). |
+| `core/include/slowops/eqartist/` | Header-only DSP, standard library only (no plugin SDK): `Filters` (band shapes, analog-matched zero-latency biquads), `EqEngine` (8 bands, glides, click-free crossfades), `CurveFit` (drawing → bands), `LiveEq` (32 bells that follow the drawing instantly while you draw), `FitWorker` (runs the fit off the audio thread), `Spectrum` + `Fft` (analyser). |
 | `plugin/` | MPC Plugin Builder SDK project: `plugin.json`, `skins/`, and `src/EqArtist.cpp` (the adapter). |
 | `scripts/` | `build.sh`, `test.sh`, `gen_skins.py` (TUI.json + Q-Links.json), `make_skin_art.py` (PNGs without text, standard library only), `make_text_art.py` (button labels and graph labels, needs Pillow), `skin_layout.py` (shared layout and palette). |
 | `assets/fonts/` | Titillium Web Bold (SIL OFL 1.1, see `OFL.txt`), drawn into the skin images by `make_text_art.py`. `plugin/skins/knob_uni.png` is the SDK's UI-kit knob (MIT), rendered in purple. |

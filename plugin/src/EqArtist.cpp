@@ -4,9 +4,11 @@
 // core/include/slowops/eqartist/ (standard library only, no SDK dependency). It:
 //   * declares the parameters (ids are permanent once released; see docs/CONTROLS.md),
 //   * paints the 32 Draw columns from the pen (an XYPad over the graph, bound to Pen X / Pen Y),
-//   * keeps fitting the drawing to bands while it changes (on the fitter's own thread) and writes
-//     each result into the band parameters, so knobs, Q-Links, automation and the project all
-//     see them,
+//   * makes the sound follow the drawing at once: while you draw, the audio comes from the live
+//     EQ (32 bells solved straight from the drawing, see LiveEq.hpp),
+//   * meanwhile keeps fitting the drawing to bands (on the fitter's own thread) and writes each
+//     result into the band parameters, so Q-Links, automation and the project all see them; once
+//     the stroke has ended and the fit matches the drawing, the sound crossfades to the bands,
 //   * keeps the drawing in step when a band is edited by hand (Q-Link, automation),
 //   * turns the self-resetting Clear / Undo buttons into actions (Undo = the last stroke),
 //   * runs the EQ engine, and writes the spectrum and the EQ's response curve into read-only
@@ -17,6 +19,7 @@
 #include "../../core/include/slowops/eqartist/EqEngine.hpp"
 #include "../../core/include/slowops/eqartist/FitWorker.hpp"
 #include "../../core/include/slowops/eqartist/Spectrum.hpp"
+#include "ParaPage.hpp"
 
 #include <algorithm>
 #include <array>
@@ -57,7 +60,8 @@ public:
         kDraw0 = kBand0 + kBands * kPerBand,
         kSpec0 = kDraw0 + kCols,
         kResp0 = kSpec0 + kCols,
-        kNumParams = kResp0 + kCols
+        kPara0 = kResp0 + kCols,      // the PARA page's block (see ParaPage.hpp)
+        kNumParams = kPara0 + eqpara::ParaPage::kNumParams
     };
     enum { kOn, kType, kFreq, kGain, kQ, kSlope };
     static int bandParam(int band, int field) { return kBand0 + band * kPerBand + field; }
@@ -105,6 +109,7 @@ public:
             const std::string n = std::to_string(c + 1);
             addDisplay(mpc::floatParam(("resp" + n).c_str(), ("Resp " + n).c_str(), -kDrawRangeDb, kDrawRangeDb, 0.0f, "dB", 1));
         }
+        eqpara::ParaPage::addParams(*this);
         if (numParams() != kNumParams) mpc::log("EqArtist: parameter count mismatch");
         for (int c = 0; c < kCols; ++c) colHz_[(std::size_t)c] = 20.0 * std::pow(1000.0, (c + 0.5) / kCols);
     }
@@ -114,7 +119,7 @@ public:
         (void)maxBlockSize;
         spectrum_.prepare(sampleRate, kCols);   // allocates
         pullBands();
-        engine_.prepare(sampleRate);
+        engine_.prepare(sampleRate, colHz_.data());
         penGapSamples_ = (int)(0.15 * sampleRate);
         syncDelaySamples_ = (int)(0.3 * sampleRate);
         displayEvery_ = (int)(sampleRate / 30.0);
@@ -132,13 +137,17 @@ public:
         drawDirty_ = false;
         selfBandWrite_ = true;   // the next pullBands() takes the loaded bands as they are
         handEdited_ = false;
+        liveDirty_ = false;
+        engine_.setLive(false);  // a loaded project plays its bands
         engine_.reset();
+        para_.reset(*this);
         respDirty_ = true;
     }
 
     void parameterChanged(int index, float plain) override
     {
         (void)plain;
+        if (index >= kPara0) { para_.parameterChanged(index - kPara0); return; }
         if (index == kPenX || index == kPenY) penSeq_.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -154,10 +163,12 @@ public:
 
         handleTriggers();
         handlePen(n);
+        updateLive();
         handleFitResult();
         requestFitIfNeeded();
         pullBands();
         syncDrawingToHandEdits(n);
+        leaveLiveWhenFitted();
 
         const int analyzer = !getBool(kAnalyzer) ? 0 : (getInt(kAnalyze) == 0 ? 1 : 2);   // off / pre / post
         if (analyzer == 1) for (int i = 0; i < n; ++i) spectrum_.push(0.5f * (inL[i] + inR[i]));
@@ -165,6 +176,8 @@ public:
         engine_.setBypass(getBool(kBypass));
         engine_.process(inL, inR, outL, outR, n);   // in place is fine
         if (analyzer == 2) for (int i = 0; i < n; ++i) spectrum_.push(0.5f * (outL[i] + outR[i]));
+
+        para_.process(*this, n);   // PARA: silent test bands, never reach the engine
 
         displayAge_ += n;
         if (displayAge_ >= displayEvery_)
@@ -178,6 +191,22 @@ public:
     bool formatValue(int index, float plain, std::string& out) override
     {
         char buf[64];
+        if (index == kPara0 + eqpara::ParaPage::pInfo) { out = para_.info(*this); return true; }
+        if (index >= kPara0)
+        {
+            const int rel = index - kPara0;
+            const bool freq = rel == eqpara::ParaPage::pSelFreq ||
+                              (rel >= eqpara::ParaPage::pBand0 && rel < eqpara::ParaPage::pNode0 &&
+                               (rel - eqpara::ParaPage::pBand0) % eqpara::ParaPage::kFields == eqpara::ParaPage::fFreq);
+            if (freq)
+            {
+                if (plain < 1000.0f) std::snprintf(buf, sizeof(buf), "%.0f Hz", (double)plain);
+                else std::snprintf(buf, sizeof(buf), "%.2f kHz", (double)plain / 1000.0);
+                out = buf;
+                return true;
+            }
+            return false;
+        }
         if (index == kFitInfo)
         {
             if (getBool(kBypass)) { out = "BYPASSED"; return true; }
@@ -213,7 +242,7 @@ private:
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 400;   // 0.4.0
+        info.version = 560;   // 0.5.6
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;
@@ -227,14 +256,6 @@ private:
         addParam(p);
     }
 
-    // Write a parameter from the plugin and tell the host, only when it changed.
-    void setValue(int i, float norm)
-    {
-        if (getNormalised(i) == norm) return;
-        setNormalised(i, norm);
-        notifyHostParameterChanged(i);
-    }
-    void setPlain(int i, float plain) { setValue(i, param(i).toNormalised(plain)); }
 
     // ---- bands <-> parameters ---------------------------------------------------------------
     eq::BandParams readBand(int b) const
@@ -262,7 +283,12 @@ private:
         if (changed)
         {
             respDirty_ = true;
-            if (!selfBandWrite_) { handEdited_ = true; sinceHandEdit_ = 0; }
+            if (!selfBandWrite_)
+            {
+                handEdited_ = true;
+                sinceHandEdit_ = 0;
+                if (engine_.live()) { engine_.setLive(false); respDirty_ = true; }   // a knob turn: hear the bands
+            }
         }
         selfBandWrite_ = false;
     }
@@ -307,8 +333,12 @@ private:
         undoFit_ = fit;
         selfBandWrite_ = true;
         drawDirty_ = false;
+        liveDirty_ = false;
         discardFit_ = fit_.busy();   // a fit still running belongs to the undone drawing
+        fittedSeq_ = ++drawSeq_;     // the restored bands belong to the restored drawing
         engine_.forceCrossfade();
+        engine_.setLive(false);
+        respDirty_ = true;
         bumpFitInfo();
     }
 
@@ -319,7 +349,8 @@ private:
             setValue(kClear, 0.0f);
             saveUndo();
             for (int c = 0; c < kCols; ++c) paint(c, 0.0f);
-            drawDirty_ = true;
+            drawDirty_ = liveDirty_ = true;
+            ++drawSeq_;
         }
         if (getBool(kUndo))
         {
@@ -337,7 +368,27 @@ private:
         if (!drawDirty_ || fit_.busy()) return;
         double db[kCols];
         for (int c = 0; c < kCols; ++c) db[c] = get(kDraw0 + c);
-        if (fit_.request(colHz_.data(), db, kCols, getInt(kMaxBands))) drawDirty_ = false;
+        if (fit_.request(colHz_.data(), db, kCols, getInt(kMaxBands))) { drawDirty_ = false; requestedSeq_ = drawSeq_; }
+    }
+
+    // The live EQ follows every change of the drawing at once.
+    void updateLive()
+    {
+        if (!liveDirty_) return;
+        liveDirty_ = false;
+        double db[kCols];
+        for (int c = 0; c < kCols; ++c) db[c] = get(kDraw0 + c);
+        engine_.setLiveDrawing(db);
+        engine_.setLive(true);
+        respDirty_ = true;
+    }
+
+    // Back to the fitted bands once the stroke has ended and the bands fit the drawing as it is now.
+    void leaveLiveWhenFitted()
+    {
+        if (!engine_.live() || drawDirty_ || liveDirty_ || fittedSeq_ != drawSeq_ || sincePen_ <= penGapSamples_) return;
+        engine_.setLive(false);
+        respDirty_ = true;
     }
 
     void handleFitResult()
@@ -345,6 +396,7 @@ private:
         eq::FitResult r;
         if (!fit_.take(r)) return;
         if (discardFit_) { discardFit_ = false; return; }
+        fittedSeq_ = requestedSeq_;
         for (int b = 0; b < kBands; ++b)
         {
             eq::BandParams p = b < r.count ? r.bands[(std::size_t)b] : eq::BandParams{};
@@ -371,6 +423,7 @@ private:
         double db[kCols];
         engine_.responseDb(colHz_.data(), db, kCols);
         for (int c = 0; c < kCols; ++c) paint(c, (float)db[c]);
+        fittedSeq_ = ++drawSeq_;   // the bands are the source of this drawing
         int on = 0;
         for (int b = 0; b < kBands; ++b) on += getBool(bandParam(b, kOn)) ? 1 : 0;
         fitBands_.store(on);
@@ -417,12 +470,26 @@ private:
         }
         lastCol_ = col;
         lastDb_ = db;
-        drawDirty_ = true;
+        drawDirty_ = liveDirty_ = true;
+        ++drawSeq_;
         handEdited_ = false;   // the pen wins over a pending hand-edit sync
     }
 
     void paint(int col, float db) { setPlain(kDraw0 + col, std::clamp(db, -kDrawRangeDb, kDrawRangeDb)); }
 
+    // ---- host interface for ParaPage (absolute parameter indices) --------------------------------
+public:
+    float getN(int i) const { return getNormalised(i); }
+    std::string paramText(int i) const { std::string t; return const_cast<EqArtist*>(this)->formatValue(i, get(i), t) ? t : param(i).display(get(i)); }
+    void setValue(int i, float norm)
+    {
+        if (getNormalised(i) == norm) return;
+        setNormalised(i, norm);
+        notifyHostParameterChanged(i);
+    }
+    void setPlain(int i, float plain) { setValue(i, param(i).toNormalised(plain)); }
+
+private:
     // ---- displays -----------------------------------------------------------------------------
     // The spectrum and the response curve are 64 read-only parameters. Every change is a message
     // to the MPC's screen, and if they come faster than the screen draws them they queue up and
@@ -430,6 +497,9 @@ private:
     // first (it rarely changes), then the biggest spectrum changes, rises before falls (a hit
     // shows at once); a spectrum bar that has fallen just one step waits for spare budget.
     static constexpr int kDisplayBudget = 8;   // per tick, at 30 ticks a second: <= 240 per second
+    static constexpr int kSpectrumShare = 2;   // spectrum updates per refresh kept while PARA catches up
+    static constexpr int kDragBudgetLine = 12; // while dragging in LINE (Curve UI Test's LINE mode on the MPC: ~146/s at 16)
+    static constexpr int kDragBudget = 16;     // while PARA curves catch up (proven on the MPC: ~146 line updates/s at 16)
 
     void updateDisplays(int analyzer, float secs)
     {
@@ -449,7 +519,8 @@ private:
         {
             respDirty_ = false;
             double db[kCols];
-            engine_.responseDb(colHz_.data(), db, kCols);
+            if (engine_.live()) for (int c = 0; c < kCols; ++c) db[c] = engine_.liveResponseDb(c);   // what you hear
+            else engine_.responseDb(colHz_.data(), db, kCols);
             for (int c = 0; c < kCols; ++c)
             {
                 // Snap to the dot film strip's 1 dB frames.
@@ -458,27 +529,96 @@ private:
                     std::round((d + kDrawRangeDb) / (2.0f * kDrawRangeDb) * (kDotFrames - 1)) / (float)(kDotFrames - 1);
             }
         }
-        for (int sent = 0; sent < kDisplayBudget; ++sent)
+        // One queue for both pages (the plugin cannot tell which tab is showing). Priority: PARA's
+        // node markers, PARA's line, PARA's band shading, DRAW's response, then the spectrum. While a
+        // PARA node is held the budget rises to kDragBudget and the spectrum waits.
+        const bool drag = para_.dragging();
+        if (para_.takeInfoDirty()) bumpParaInfo();
+        int count = 0;
+        auto add = [&](int idx, float want, float frames, float base, bool spectrum) {
+            items_[(std::size_t)count++] = {idx, want, frames, base, spectrum};
+        };
+        const int P = kPara0;
+        for (int k = 0; k < 2 * eqpara::ParaPage::kBands; ++k) add(P + eqpara::ParaPage::pNode0 + k, para_.nodeTargets()[(std::size_t)k], 4000.0f, 4000.0f, false);
+        add(P + eqpara::ParaPage::pSelNodeX, para_.selNodeTargets()[0], 4000.0f, 4000.0f, false);
+        add(P + eqpara::ParaPage::pSelNodeY, para_.selNodeTargets()[1], 4000.0f, 4000.0f, false);
+        // PARA curves. While a node is dragged only the nodes and the dragged band's own curve are sent (the
+        // grey combined curve and the fill catch up when the finger stops): in LINE every column is 6 image
+        // tiles, and sending everything during a drag swamped the MPC's screen until touches stopped.
+        // Only the visible style's curves are sent.
+        const bool dots = getInt(P + eqpara::ParaPage::pStyle) == 0;   // DOTS is the first (default) style
+        if (dots)
+            for (int k = 0; k < eq::ShadeStrip::kCols; ++k) add(P + eqpara::ParaPage::pShade0 + k, para_.shadeTargets()[(std::size_t)k], (float)(eq::ShadeStrip::kFrames - 1), 3000.0f, false);
+        else
+            for (int k = 0; k < eqpara::ParaPage::kLineCols; ++k) add(P + eqpara::ParaPage::pLine0 + k, para_.lineTargets()[(std::size_t)k], (float)(eqpara::ParaPage::Line::kFrames - 1), 3000.0f, false);
+        if (!drag)
+        {
+            if (dots)
+                for (int k = 0; k < eq::ShadeStrip::kCols; ++k) add(P + eqpara::ParaPage::pBgDot0 + k, para_.bgDotTargets()[(std::size_t)k], (float)(eq::ShadeStrip::kFrames - 1), 2000.0f, false);
+            else
+                for (int k = 0; k < eqpara::ParaPage::kLineCols; ++k) add(P + eqpara::ParaPage::pBgLine0 + k, para_.bgLineTargets()[(std::size_t)k], (float)(eqpara::ParaPage::Line::kFrames - 1), 2000.0f, false);
+            for (int k = 0; k < eqpara::ParaPage::kLineCols; ++k) add(P + eqpara::ParaPage::pFill0 + k, para_.fillTargets()[(std::size_t)k], (float)(eqpara::ParaPage::kFillFrames - 1), 1500.0f, false);
+        }
+        for (int k = 0; k < kCols; ++k) add(kResp0 + k, want_[(std::size_t)(kCols + k)], (float)(kDotFrames - 1), 1000.0f, false);
+        if (!drag) for (int k = 0; k < kCols; ++k) add(kSpec0 + k, want_[(std::size_t)k], (float)(kSpecFrames - 1), 0.0f, true);
+        // The higher budget whenever PARA curves are still catching up (a drag, a knob, a band change), so
+        // a change settles in well under a second; otherwise the proven 8 per refresh.
+        bool paraPending = drag || para_.curvesPending();
+        for (int k = 0; k < count && !paraPending; ++k)
+            paraPending = !items_[(std::size_t)k].spectrum && items_[(std::size_t)k].idx >= kPara0 &&
+                          std::fabs(items_[(std::size_t)k].want - getNormalised(items_[(std::size_t)k].idx)) * items_[(std::size_t)k].frames >= 0.5f;
+        // LINE columns are 6 tiles each: a lower budget while dragging in LINE.
+        const int budget = drag ? (dots ? kDragBudget : kDragBudgetLine) : (paraPending ? kDragBudget : kDisplayBudget);
+        for (int sent = 0; sent < budget; ++sent)
         {
             int best = -1;
             float bestScore = 0.0f;
-            for (int k = 0; k < 2 * kCols; ++k)
+            for (int k = 0; k < count; ++k)
             {
-                const int idx = k < kCols ? kSpec0 + k : kResp0 + (k - kCols);
-                const float frames = k < kCols ? (float)(kSpecFrames - 1) : (float)(kDotFrames - 1);
-                const float diff = (want_[(std::size_t)k] - getNormalised(idx)) * frames;   // in frames
+                const DisplayItem& it = items_[(std::size_t)k];
+                const float diff = (it.want - getNormalised(it.idx)) * it.frames;   // in frames
                 if (std::fabs(diff) < 0.5f) continue;
                 float score;
-                if (k >= kCols) score = 100.0f + std::fabs(diff);                // the curve: rarely moves, always first
-                else if (diff > 0.0f) score = 2.0f * diff;                       // spectrum rising: a hit shows at once
-                else if (diff <= -1.5f) score = -diff;                           // spectrum falling 2+ steps
-                else score = 0.1f;                                               // a 1-step fall: only with budget to spare
+                if (!it.spectrum) score = it.base + std::min(std::fabs(diff), 999.0f);
+                else if (diff > 0.0f) score = 2.0f * diff;          // spectrum rising: a hit shows at once
+                else if (diff <= -1.5f) score = -diff;              // spectrum falling 2+ steps
+                else score = 0.1f;                                  // a 1-step fall: only with budget to spare
                 if (score > bestScore) { bestScore = score; best = k; }
             }
             if (best < 0) break;
-            setValue(best < kCols ? kSpec0 + best : kResp0 + (best - kCols), want_[(std::size_t)best]);
+            setValue(items_[(std::size_t)best].idx, items_[(std::size_t)best].want);
         }
+        // While PARA curves catch up (not during a drag, when the spectrum pauses on purpose), the spectrum
+        // still gets kSpectrumShare updates per refresh, so it never freezes behind a big redraw.
+        if (paraPending && !drag)
+            for (int sent = 0; sent < kSpectrumShare; ++sent)
+            {
+                int best = -1;
+                float bestScore = 0.0f;
+                for (int k = 0; k < count; ++k)
+                {
+                    const DisplayItem& it = items_[(std::size_t)k];
+                    if (!it.spectrum) continue;
+                    const float diff = (it.want - getNormalised(it.idx)) * it.frames;
+                    if (std::fabs(diff) < 0.5f) continue;
+                    const float score = diff > 0.0f ? 2.0f * diff : -diff;
+                    if (score > bestScore) { bestScore = score; best = k; }
+                }
+                if (best < 0) break;
+                setValue(items_[(std::size_t)best].idx, items_[(std::size_t)best].want);
+            }
     }
+
+    void bumpParaInfo()
+    {
+        paraInfoCounter_ = (paraInfoCounter_ + 1) % 100;
+        setValue(kPara0 + eqpara::ParaPage::pInfo, (float)paraInfoCounter_ / 99.0f);
+    }
+
+    struct DisplayItem { int idx; float want, frames, base; bool spectrum; };
+    std::array<DisplayItem, 2 * eqpara::ParaPage::kBands + 2 + 3 * eq::LineStrip::kCols + eq::ShadeStrip::kCols + 2 * kCols> items_{};
+    int paraInfoCounter_ = 0;
+    eqpara::ParaPage para_{kPara0};
 
     eq::EqEngine engine_;
     eq::Spectrum spectrum_;
@@ -486,7 +626,8 @@ private:
     std::array<double, kCols> colHz_{};
     std::array<float, 2 * kCols> want_{};   // display targets: spectrum, then response
     int displayAge_ = 0, displayEvery_ = 1470;
-    bool respDirty_ = true, drawDirty_ = false, discardFit_ = false, lastBypass_ = false;
+    bool respDirty_ = true, drawDirty_ = false, liveDirty_ = false, discardFit_ = false, lastBypass_ = false;
+    uint32_t drawSeq_ = 0, requestedSeq_ = 0, fittedSeq_ = 0;   // which drawing the bands were fitted to
 
     std::atomic<uint32_t> penSeq_{0};
     uint32_t lastPenSeq_ = 0;

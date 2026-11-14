@@ -5,6 +5,8 @@
 #include "slowops/eqartist/EqEngine.hpp"
 #include "slowops/eqartist/Fft.hpp"
 #include "slowops/eqartist/Filters.hpp"
+#include "slowops/eqartist/LineStrip.hpp"
+#include "slowops/eqartist/LiveEq.hpp"
 #include "slowops/eqartist/Spectrum.hpp"
 
 #include <chrono>
@@ -204,13 +206,16 @@ static void testCutSlopes()
     }
 }
 
+static std::vector<double> columnHz();
+
 static void testEngine()
 {
     std::printf("== Engine: response, stability under fast changes, bypass\n");
     const double sr = 48000.0;
     eq::EqEngine e;
     e.setBand(0, band(eq::BandType::Bell, 1000.0, 9.0, 1.0));
-    e.prepare(sr);
+    const auto hzc = columnHz();
+    e.prepare(sr, hzc.data());
     // A 1 kHz sine through a +9 dB bell at 1 kHz comes out 9 dB louder.
     const int n = 48000;
     std::vector<float> l((std::size_t)n), r((std::size_t)n);
@@ -342,6 +347,153 @@ static void testFitDrawnShapes()
     CHECK(fit.fit(hz, db, 3).count <= 3, "Max Bands 3 ignored");
 }
 
+static void testLiveEq()
+{
+    std::printf("== LiveEq: the 32 live bells land on the drawing\n");
+    const auto hz = columnHz();
+    struct Shape { const char* name; double (*fn)(double lf); double maxErr; };
+    const Shape shapes[] = {
+        {"smile", [](double lf) { return 10.0 * std::pow(2 * lf - 1, 2) - 3.0; }, 0.6},
+        {"tilt", [](double lf) { return -8.0 + 16.0 * lf; }, 0.6},
+        {"bump + dip", [](double lf) { const double a = (lf - 0.3) / 0.08, b = (lf - 0.7) / 0.06;
+                                      return 9.0 * std::exp(-a * a) - 8.0 * std::exp(-b * b); }, 0.8},
+        {"steep step", [](double lf) { return lf < 0.5 ? -12.0 : 12.0; }, 4.0},   // a cliff: smoothed, by design
+        {"flat", [](double) { return 0.0; }, 0.01},
+    };
+    for (double sr : {44100.0, 48000.0})
+    {
+        eq::LiveEq live;
+        live.prepare(sr, hz.data());
+        for (const Shape& sh : shapes)
+        {
+            std::vector<double> db(32);
+            for (int c = 0; c < 32; ++c) db[(std::size_t)c] = sh.fn(std::log10(hz[(std::size_t)c] / 20.0) / 3.0);
+            live.setDrawing(db.data());
+            double worst = 0, worstDigital = 0;
+            for (int c = 0; c < 32; ++c) worst = std::fmax(worst, std::fabs(live.responseDb(c) - db[(std::size_t)c]));
+            // The digital filters, after the gain glide has settled.
+            for (int k = 0; k < 400; ++k) live.control();
+            for (int c = 0; c < 32; ++c)
+            {
+                double dsum = 0;
+                for (int b = 0; b < 32; ++b)
+                {
+                    eq::BandParams p; p.on = live.gainDb(b) != 0.0; p.type = eq::BandType::Bell;
+                    p.freq = hz[(std::size_t)b]; p.gainDb = live.gainDb(b); p.q = eq::LiveEq::kQ;
+                    if (p.on) dsum += eq::digitalDb(eq::design(p, sr), hz[(std::size_t)c], sr);
+                }
+                if (hz[(std::size_t)c] < 0.25 * sr) worstDigital = std::fmax(worstDigital, std::fabs(dsum - db[(std::size_t)c]));
+            }
+            if (sr == 44100.0) std::printf("  %-11s %.2f dB off at the columns (digital, to 11 kHz: %.2f dB)\n", sh.name, worst, worstDigital);
+            CHECK(worst < sh.maxErr, "%s @ %.0f: live EQ %.2f dB off the drawing", sh.name, sr, worst);
+            CHECK(worstDigital < sh.maxErr + 0.3, "%s @ %.0f: digital live EQ %.2f dB off", sh.name, sr, worstDigital);
+        }
+    }
+    // Cost: setDrawing must be cheap enough for the audio thread.
+    eq::LiveEq live;
+    live.prepare(44100.0, hz.data());
+    std::vector<double> db(32);
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int k = 0; k < 1000; ++k) { for (int c = 0; c < 32; ++c) db[(std::size_t)c] = 10.0 * std::sin(c * 0.3 + k); live.setDrawing(db.data()); }
+    const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / 1000.0;
+    std::printf("  setDrawing: %.0f us per call (desktop)\n", us);
+    CHECK(us < 500.0, "setDrawing takes %.0f us", us);
+}
+
+static void testLineStrip()
+{
+    std::printf("== LineStrip / ShadeStrip / GraphMap / hitTest (the PARA page's drawing)\n");
+    // A narrow +18 dB bell (Q 10) and a wide cut: segments join, vertices sit on the curve, peaks reach.
+    for (auto bandSpec : {std::array<double, 3>{365.0, 18.0, 10.0}, std::array<double, 3>{3000.0, -9.0, 0.7}})
+    {
+        const eq::BandParams b = band(eq::BandType::Bell, bandSpec[0], bandSpec[1], bandSpec[2]);
+        float cols[eq::LineStrip::kCols];
+        eq::LineStrip::encode([&](double hz) { return eq::analogDb(b, hz); }, cols);
+        bool joined = true;
+        double prevRight = 0, top = -100, bottom = 100, worst = 0;
+        for (int c = 0; c < eq::LineStrip::kCols; ++c)
+        {
+            double l, r;
+            eq::LineStrip::decode(cols[c], l, r);
+            if (c > 0 && std::fabs(l - prevRight) > 1e-9) joined = false;
+            prevRight = r;
+            top = std::fmax(top, std::fmax(l, r));
+            bottom = std::fmin(bottom, std::fmin(l, r));
+            double ext = 0;
+            for (int s2 = -2; s2 <= 2; ++s2)
+            {
+                const double d = eq::analogDb(b, eq::GraphMap::xToHz((c + s2 * 0.25) / eq::LineStrip::kCols));
+                if (std::fabs(d) > std::fabs(ext)) ext = d;
+            }
+            worst = std::fmax(worst, std::fabs(l - std::fmax(-18.0, std::fmin(18.0, ext))));
+        }
+        CHECK(joined, "LineStrip segments do not join");
+        CHECK(worst <= 1.01, "LineStrip vertices off the curve by %.2f dB", worst);
+        if (bandSpec[1] > 0) CHECK(top >= 17.5, "Q 10 +18 dB bell: line peak %.2f dB", top);
+        else CHECK(bottom <= bandSpec[1] + 0.2, "cut: line bottom %.2f dB, curve %.1f", bottom, bandSpec[1]);
+        float shade[eq::ShadeStrip::kCols];
+        eq::ShadeStrip::encode([&](double hz) { return eq::analogDb(b, hz); }, shade);
+        double sTop = 0;
+        for (float v : shade) sTop = std::fabs(v * 36.0 - 18.0) > std::fabs(sTop) ? v * 36.0 - 18.0 : sTop;
+        CHECK(std::fabs(std::fabs(sTop) - std::fabs(std::fmax(-18.0, std::fmin(18.0, bandSpec[1])))) < 0.6,
+              "shade extreme %.2f dB, band %.1f", sTop, bandSpec[1]);
+    }
+    // Encoding from cached samples gives exactly what encoding the function does (the PARA cache relies on it),
+    // including a summed response built from per-band samples.
+    {
+        const eq::BandParams b1 = band(eq::BandType::Bell, 300.0, 6.0, 2.0), b2 = band(eq::BandType::HighShelf, 4000.0, -5.0, 0.7);
+        auto sum = [&](double hz) { return eq::analogDb(b1, hz) + eq::analogDb(b2, hz); };
+        static double q1[eq::LineStrip::kQuarterPoints], q2[eq::LineStrip::kQuarterPoints], qs[eq::LineStrip::kQuarterPoints];
+        eq::LineStrip::sample([&](double hz) { return eq::analogDb(b1, hz); }, q1);
+        eq::LineStrip::sample([&](double hz) { return eq::analogDb(b2, hz); }, q2);
+        for (int i = 0; i < eq::LineStrip::kQuarterPoints; ++i) qs[i] = q1[i] + q2[i];
+        float direct[eq::LineStrip::kCols], cached[eq::LineStrip::kCols];
+        eq::LineStrip::encode(sum, direct);
+        eq::LineStrip::encodeSampled(qs, cached);
+        int diff = 0;
+        for (int c = 0; c < eq::LineStrip::kCols; ++c) diff += direct[c] != cached[c];
+        CHECK(diff == 0, "LineStrip: %d columns differ between direct and cached-sample encoding", diff);
+        static double s1[eq::ShadeStrip::kPoints];
+        eq::ShadeStrip::sample(sum, s1);
+        float sd[eq::ShadeStrip::kCols], sc[eq::ShadeStrip::kCols];
+        eq::ShadeStrip::encode(sum, sd);
+        eq::ShadeStrip::encodeSampled(s1, sc);
+        int sdiff = 0;
+        for (int c = 0; c < eq::ShadeStrip::kCols; ++c) sdiff += sd[c] != sc[c];
+        CHECK(sdiff == 0, "ShadeStrip: %d columns differ between direct and cached-sample encoding", sdiff);
+    }
+    // LineStrip76 (the PARA line): joined, on the curve, peaks reach; and cached encoding equals direct.
+    {
+        const eq::BandParams b = band(eq::BandType::Bell, 365.0, 18.0, 10.0);
+        float cols[eq::LineStrip76::kCols];
+        eq::LineStrip76::encode([&](double hz) { return eq::analogDb(b, hz); }, cols);
+        bool joined = true;
+        double prevRight = 0, top = -100;
+        for (int c = 0; c < eq::LineStrip76::kCols; ++c)
+        {
+            double l, r;
+            eq::LineStrip76::decode(cols[c], l, r);
+            if (c > 0 && std::fabs(l - prevRight) > 1e-9) joined = false;
+            prevRight = r;
+            top = std::fmax(top, std::fmax(l, r));
+        }
+        CHECK(joined, "LineStrip76 segments do not join");
+        CHECK(top >= 17.0, "LineStrip76: Q 10 +18 dB bell peaks at %.2f dB", top);
+    }
+    // Mapping round trips.
+    for (double hz : {20.0, 100.0, 1234.0, 20000.0})
+        CHECK(std::fabs(eq::GraphMap::xToHz(eq::GraphMap::hzToX(hz)) - hz) < hz * 1e-9, "x round trip at %.0f Hz", hz);
+    for (double db : {-18.0, -3.5, 0.0, 12.0, 18.0})
+        CHECK(std::fabs(eq::GraphMap::yToDb(eq::GraphMap::dbToY(db)) - db) < 1e-9, "y round trip at %.1f dB", db);
+    CHECK(eq::GraphMap::dbToY(18.0) == 1.0, "Y = 1 must be +18 dB (the top: the MPC's XYPad)");
+    // Hit test: nearest shown node within the radius.
+    const double nx[3] = {0.20, 0.25, 0.70}, ny[3] = {0.5, 0.5, 0.8};
+    const bool all[3] = {true, true, true}, hide1[3] = {true, false, true};
+    CHECK(eq::hitTest(nx, ny, all, 3, 0.235, 0.5, 1216, 408, 44) == 1, "nearest node not picked");
+    CHECK(eq::hitTest(nx, ny, hide1, 3, 0.235, 0.5, 1216, 408, 44) == 0, "a hidden node was picked");
+    CHECK(eq::hitTest(nx, ny, all, 3, 0.45, 0.1, 1216, 408, 44) == -1, "a far touch picked a node");
+}
+
 int main()
 {
     testFft();
@@ -353,6 +505,8 @@ int main()
     testEngine();
     testFitKnownCurves();
     testFitDrawnShapes();
+    testLiveEq();
+    testLineStrip();
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }
