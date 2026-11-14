@@ -6,9 +6,9 @@ palette in skin_layout.py changes.
 
   bg.png        1280 x 628   page, graph panel, grid
   spec_bar.png  38 x (432 x 36)  spectrum column film strip: frame k = bar k/35 of the graph tall
-  dot.png       38 x (432 x 37)  drawn-curve film strip: frame k = a dot at -18 + k dB
-  thumb.png     38 x 24      vertical slider thumb (same dot)
+  dot.png       38 x (432 x 37)  curve film strip (drawing and response): frame k = a dot at -18 + k dB
   puck.png      40 x 40      pen XYPad puck (a ring)
+  btn_on.png / btn_off.png   170 x 38  translucent button faces (the label sits beneath them)
 
 Film strips stack frames top to bottom and stay under 16384 px tall.
 """
@@ -126,18 +126,36 @@ def dot():
     c.save('dot.png')
 
 
-def thumb():
-    w, h = L.THUMB
-    c = Canvas(w, h)
-    c.disc(w / 2, h / 2, 6.5, L.CURVE, 1.0, glow=5, glow_rgb=L.GLOW)
-    c.save('thumb.png')
-
-
 def puck():
     c = Canvas(L.PUCK, L.PUCK)
     c.ring(L.PUCK / 2, L.PUCK / 2, 15, 3, L.CURVE, 0.9)
     c.disc(L.PUCK / 2, L.PUCK / 2, 3, L.CURVE, 0.9)
     c.save('puck.png')
+
+
+def rounded_rect(c, w, h, radius, fill, fill_a, edge, edge_a, width=2.0):
+    for y in range(h):
+        for x in range(w):
+            # Distance outside a rounded rectangle (negative inside).
+            qx = max(abs(x + 0.5 - w / 2) - (w / 2 - radius), 0)
+            qy = max(abs(y + 0.5 - h / 2) - (h / 2 - radius), 0)
+            d = math.hypot(qx, qy) - radius
+            inside = min(1.0, max(0.0, 0.5 - d))
+            if inside <= 0:
+                continue
+            c.blend(x, y, fill, fill_a * inside)
+            ring = min(1.0, max(0.0, width - abs(d + width / 2) + 0.5))
+            c.blend(x, y, edge, edge_a * ring * inside)
+
+
+def buttons():
+    w, h = L.BUTTON_W, L.BUTTON_H
+    off = Canvas(w, h)
+    rounded_rect(off, w, h, 8, L.PANEL, 0.25, L.GRID_HI, 1.0)
+    off.save('btn_off.png')
+    on = Canvas(w, h)
+    rounded_rect(on, w, h, 8, L.GLOW, 0.35, L.CURVE, 1.0, 2.5)
+    on.save('btn_on.png')
 
 
 def main():
@@ -146,8 +164,8 @@ def main():
     background()
     spec_bar()
     dot()
-    thumb()
     puck()
+    buttons()
 
 
 if __name__ == '__main__':

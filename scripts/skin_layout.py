@@ -16,7 +16,7 @@ PANEL = (42, 22, 62)         # graph panel
 GRID = (64, 40, 88)          # minor grid
 GRID_HI = (112, 72, 143)     # 0 dB line, panel outline
 SPEC = (153, 113, 192)       # spectrum bars
-CURVE = (236, 222, 255)      # drawn curve dots / thumbs
+CURVE = (236, 222, 255)      # curve dots, button outlines
 GLOW = (190, 140, 255)       # glow around the curve
 TEXT = (204, 187, 221)
 TEXT_DIM = (150, 120, 180)
@@ -33,10 +33,9 @@ COL_W = 38
 GRAPH = (32, 48, NUM_COLS * COL_W, 432)      # 1216 x 432
 F_LO, F_HI = 20.0, 20000.0
 DRAW_RANGE_DB = 18.0
-DRAW_MARGIN = 12                              # half the thumb height: the curve's travel inset
+DRAW_MARGIN = 12                              # the curve's top and bottom inset
 SPEC_FRAMES = 36                              # spectrum bar heights (must match EqArtist.cpp)
 DOT_FRAMES = 37                               # drawn-curve dot positions: -18..+18 dB in 1 dB steps
-THUMB = (COL_W, 24)
 PUCK = 40
 
 
@@ -46,7 +45,7 @@ def freq_x(f):
 
 
 def db_y(db):
-    """Centre y of the curve at db, matching a vertical slider's thumb travel."""
+    """Centre y of the curve dot at db."""
     _, gy, _, gh = GRAPH
     travel = gh - 2 * DRAW_MARGIN
     return gy + DRAW_MARGIN + travel * (0.5 - db / (2 * DRAW_RANGE_DB))
@@ -56,7 +55,19 @@ FREQ_LABELS = [(50, '50'), (100, '100'), (200, '200'), (500, '500'), (1000, '1k'
                (5000, '5k'), (10000, '10k')]
 DB_LINES = [-12, -6, 0, 6, 12]
 
-# ---- readouts (top strip) and controls (bottom row) -------------------------------------------
-READOUT_Y, READOUT_H = 6, 36
-CONTROL_Y, CONTROL_H, CONTROL_W = 500, 107, 278
-CONTROL_X = [32, 344, 656, 968]
+# ---- EQ tab: buttons and status (top strip), controls (bottom row) ---------------------------
+BUTTON_W, BUTTON_H = 170, 38
+BUTTON_Y = 5
+BUTTONS = [('Draw', 'DRAW', 32), ('Apply', 'APPLY', 216), ('Clear', 'CLEAR', 400), ('Undo', 'UNDO', 584)]
+FIT_INFO = (780, 5, 468, 38)
+CONTROL_Y, CONTROL_H = 498, 107
+CONTROLS = ['Output', 'Max Bands', 'Analyzer', 'Speed', 'Bypass']
+CONTROL_W = 230
+CONTROL_X = [32 + i * 246.5 for i in range(len(CONTROLS))]
+
+# ---- BANDS tabs: 4 bands x 6 controls -----------------------------------------------------------
+BAND_FIELDS = ['On', 'Type', 'Freq', 'Gain', 'Q', 'Slope']
+BAND_COL_X = [32 + i * 204 for i in range(6)]
+BAND_COL_W = 196
+BAND_ROW_Y = [12 + r * 152 for r in range(4)]
+BAND_ROW_H = 107

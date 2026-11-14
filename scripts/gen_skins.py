@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Write plugin/skins/TUI.json and Q-Links.json for EQ Artist (SPIKE build: three test tabs).
+"""Write plugin/skins/TUI.json and Q-Links.json for EQ Artist.
 
 Standard library only. Hand-built skin; build.py copies plugin/skins/ verbatim. Parameter
 indices come from plugin/build/params.json (written by `build.py --target native`), looked up
 by name, so the skin always matches the binary. Layout and palette come from skin_layout.py,
 the PNGs from make_skin_art.py.
 
-Tabs (see docs/SPIKE.md for what to check on the device):
-  PEN      spectrum bars, the drawn curve as film-strip dots, and one transparent XYPad over the
-           whole graph bound to Pen X / Pen Y. The plugin paints the columns from the pen.
-  COLUMNS  spectrum bars and 32 vertical sliders (Draw 1..32) with a dot thumb. Swipe across
-           them: "Swipe cols" says how many columns one gesture changed.
-  OVERLAP  the sliders with the pen XYPad on top, to see which widget takes the touch.
-Every tab has the same bottom row: Clear, Source (Input / Sweep), Disp Rate, Flip Y.
+EQ tab (back to front):
+  * the background (graph grid), then 32 spectrum bars (film strips bound to "Spec n");
+  * the curve: 32 dots bound to "Resp n" (the EQ you hear) while Draw is off, or to "Draw n"
+    (your drawing) while Draw is on;
+  * the pen: one transparent XYPad over the graph (Pen X / Pen Y), shown only in Draw mode. The
+    plugin paints the columns from it;
+  * DRAW / APPLY / CLEAR / UNDO: a text label under a translucent image button;
+  * the fit status ("Fit"'s value text), and Output, Max Bands, Analyzer, Speed, Bypass.
+BANDS 1-4 / BANDS 5-8: one row per band: On, Type, Freq, Gain, Q, Slope.
 """
 import json
 import os
@@ -32,24 +34,22 @@ def P(name):
     return 'Parameter %d' % IDX[name]
 
 
-NO_BG = {'version': 1, 'focussed': {'version': 1, 'colour': '0', 'image': ''},
-         'unfocussed': {'version': 1, 'colour': '0', 'image': ''}}
-
-
 def rect(r):
     return ' '.join('%g' % round(v, 2) for v in r)
 
 
-def entry(name, typ, data, r, show='Show', focus='No'):
+def entry(name, typ, data, r, show='Show', focus='No', only=None):
+    b = {'version': 2 if only else 1, 'acceptsHWFocus': focus, 'showWhenDataModelInvalid': show,
+         'whenVisible': 'Always', 'boundsType': 'Absolute', 'bounds': rect(r)}
+    if only:
+        b['additionalInvalidatingHandles'] = [only]
     return {'version': 2, 'componentData': {'version': 1, 'name': name, 'type': typ, 'data': data},
-            'handle remapping': {'version': 1, 'map': []},
-            'bounds': {'version': 1, 'acceptsHWFocus': focus, 'showWhenDataModelInvalid': show,
-                       'whenVisible': 'Always', 'boundsType': 'Absolute', 'bounds': rect(r)}}
+            'handle remapping': {'version': 1, 'map': []}, 'bounds': b}
 
 
-def filmstrip(name, img, frames, handle, r):
+def filmstrip(name, img, frames, handle, r, only=None):
     return entry(name, 'Image', {'version': 2, 'imageType': 'FilmStrip', 'colour': '0', 'image': img,
-                                 'numFrames': frames, 'handleName': handle}, r)
+                                 'numFrames': frames, 'handleName': handle}, r, only=only)
 
 
 def text_style(size, colour, just):
@@ -62,28 +62,28 @@ def text(name, s, r, size=16, colour=L.TEXT_DIM, just='horizontallyCentred verti
                                  'handleName': 'Invalid', 'text': s}, r)
 
 
-def value(name, handle, r, size=24, colour=L.TEXT, just='left verticallyCentred'):
+def value(name, handle, r, size=22, colour=L.TEXT, just='right verticallyCentred'):
     return entry(name, 'Label', {'version': 1, 'textStyle': text_style(size, colour, just), 'type': 'Value',
                                  'handleName': handle}, r, 'Hide')
 
 
-def vslider(name, handle, r):
-    return entry(name, 'Slider', {'version': 4, 'sliderType': 'TrackAndThumb', 'direction': 'Vertical',
-                                  'thumbImage': 'thumb.png', 'thumbTrackVisible': False, 'revealedImage': '',
-                                  'revealType': 'Normal', 'handleName': handle}, r, 'Hide', 'Yes')
+def button(name, handle, r):
+    return entry(name, 'Button', {'version': 2, 'onImage': 'btn_on.png', 'offImage': 'btn_off.png',
+                                  'buttonId': 1, 'numButtonsInGroup': 1, 'handleName': handle,
+                                  'gestureBehaviour': 'Instant'}, r, 'Hide')
 
 
-def generic_slider(name, handle, r):
+def slider(name, handle, r):
     return entry(name, 'Slider', {'version': 1, 'handleName': handle}, r, 'Hide', 'Yes')
 
 
-def xypad(name, x_handle, y_handle, img, r):
+def xypad(name, x_handle, y_handle, img, r, only=None):
     return entry(name, 'XYPad', {'version': 1, 'xPositionHandle': x_handle, 'yPositionHandle': y_handle,
-                                 'image': img}, r, 'Show', 'Yes')
+                                 'image': img}, r, 'Show', 'No', only)
 
 
 def tab(name, key, children):
-    bg = {'version': 1, 'colour': L.argb(L.BG), 'image': 'bg.png'}
+    bg = {'version': 1, 'colour': L.argb(L.BG), 'image': 'bg.png' if key == 0 else ''}
     return {'version': 1, 'tabName': name, 'fnKeyIndex': key, 'fnKeySubIndex': 0,
             'componentDefinition': {'version': 2, 'actions': [],
                                     'backgroundData': {'version': 1, 'focussed': bg, 'unfocussed': bg},
@@ -97,89 +97,105 @@ def col_rect(c):
     return (gx + c * L.COL_W, gy, L.COL_W, gh)
 
 
-def spectrum():
-    return [filmstrip('spec %d' % (c + 1), 'spec_bar.png', L.SPEC_FRAMES, P('Spec %d' % (c + 1)), col_rect(c))
+def eq_tab():
+    draw_on = 'IndexedEnabling/1/2/%s' % P('Draw')
+    draw_off = 'IndexedEnabling/0/2/%s' % P('Draw')
+    out = []
+    out += [filmstrip('spec %d' % (c + 1), 'spec_bar.png', L.SPEC_FRAMES, P('Spec %d' % (c + 1)), col_rect(c))
+            for c in range(L.NUM_COLS)]
+    out += [filmstrip('resp %d' % (c + 1), 'dot.png', L.DOT_FRAMES, P('Resp %d' % (c + 1)), col_rect(c), draw_off)
+            for c in range(L.NUM_COLS)]
+    out += [filmstrip('draw %d' % (c + 1), 'dot.png', L.DOT_FRAMES, P('Draw %d' % (c + 1)), col_rect(c), draw_on)
             for c in range(L.NUM_COLS)]
 
-
-def curve_dots():
-    return [filmstrip('dot %d' % (c + 1), 'dot.png', L.DOT_FRAMES, P('Draw %d' % (c + 1)), col_rect(c))
-            for c in range(L.NUM_COLS)]
-
-
-def sliders():
-    return [vslider('draw %d' % (c + 1), P('Draw %d' % (c + 1)), col_rect(c)) for c in range(L.NUM_COLS)]
-
-
-def pen():
-    # The puck stays inside its pad, so the pad overhangs the graph by half a puck on every side:
-    # the puck's centre then reaches the graph's edges.
     gx, gy, gw, gh = L.GRAPH
-    h = L.PUCK / 2.0
-    return [xypad('pen', P('Pen X'), P('Pen Y'), 'puck.png', (gx - h, gy - h, gw + 2 * h, gh + 2 * h))]
-
-
-def axis_labels():
-    gx, gy, gw, gh = L.GRAPH
-    out = [text('f %s' % s, s, (L.freq_x(f) - 30, gy + gh - 26, 60, 22)) for f, s in L.FREQ_LABELS]
+    out += [text('f %s' % s, s, (L.freq_x(f) - 30, gy + gh - 26, 60, 22)) for f, s in L.FREQ_LABELS]
     for db in (12, 0, -12):
-        y = L.db_y(db)
-        out.append(text('db %d' % db, '%+d' % db if db else '0', (gx + 6, y - 22, 50, 20), 15,
+        out.append(text('db %d' % db, '%+d' % db if db else '0', (gx + 6, L.db_y(db) - 22, 50, 20), 15,
                         just='left verticallyCentred'))
+
+    # The pen. The puck stays inside its pad, so the pad overhangs the graph by half a puck on
+    # every side: the puck's centre then reaches the graph's edges.
+    h = L.PUCK / 2.0
+    out.append(xypad('pen', P('Pen X'), P('Pen Y'), 'puck.png', (gx - h, gy - h, gw + 2 * h, gh + 2 * h), draw_on))
+
+    # Buttons: the label first, the translucent button over it (the button takes the touch).
+    for pname, caption, x in L.BUTTONS:
+        r = (x, L.BUTTON_Y, L.BUTTON_W, L.BUTTON_H)
+        out.append(text('label ' + caption, caption, r, 20, L.TEXT))
+        out.append(button(caption.lower(), P(pname), r))
+    out.append(value('fit info', P('Fit'), L.FIT_INFO))
+    out += [slider(n.lower(), P(n), (x, L.CONTROL_Y, L.CONTROL_W, L.CONTROL_H))
+            for n, x in zip(L.CONTROLS, L.CONTROL_X)]
     return out
 
 
-def readouts(items):
-    """items: list of (caption, param name). Laid out left to right along the top strip."""
-    out, x = [], L.GRAPH[0]
-    for cap, name in items:
-        out.append(text('cap ' + cap, cap, (x, L.READOUT_Y, 130, L.READOUT_H), 18, L.TEXT_DIM, 'left verticallyCentred'))
-        out.append(value('val ' + cap, P(name), (x + 132, L.READOUT_Y, 110, L.READOUT_H)))
-        x += 260
+def bands_tab(first):
+    out = []
+    for r in range(4):
+        b = first + r + 1
+        for c, field in enumerate(L.BAND_FIELDS):
+            out.append(slider('b%d %s' % (b, field.lower()), P('B%d %s' % (b, field)),
+                              (L.BAND_COL_X[c], L.BAND_ROW_Y[r], L.BAND_COL_W, L.BAND_ROW_H)))
     return out
-
-
-def controls():
-    names = ('Clear', 'Source', 'Disp Rate', 'Flip Y')
-    return [generic_slider(n.lower(), P(n), (x, L.CONTROL_Y, L.CONTROL_W, L.CONTROL_H))
-            for n, x in zip(names, L.CONTROL_X)]
 
 
 def main():
-    pen_tab = ([] + spectrum() + curve_dots() + axis_labels() + pen()
-               + readouts([('PEN /S', 'Pen Rate'), ('POINTS', 'Pen Pts'), ('X', 'Pen X'), ('Y', 'Pen Y')]) + controls())
-    cols_tab = (spectrum() + axis_labels() + sliders()
-                + readouts([('SWIPE COLS', 'Swipe Cols')]) + controls())
-    overlap_tab = (spectrum() + axis_labels() + sliders() + pen()
-                   + readouts([('PEN /S', 'Pen Rate'), ('SWIPE COLS', 'Swipe Cols')]) + controls())
+    types = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt']
+    slopes = ['6 dB', '12 dB', '18 dB', '24 dB', '36 dB', '48 dB']
+    reps = [{'key': P(n), 'value': ['Off', 'On']} for n in ('Draw', 'Apply', 'Clear', 'Undo', 'Bypass')]
+    reps += [{'key': P('Analyzer'), 'value': ['Off', 'Pre', 'Post']},
+             {'key': P('Speed'), 'value': ['Slow', 'Medium', 'Fast']},
+             {'key': P('Max Bands'), 'value': [str(k) for k in range(1, 9)]}]
+    for b in range(1, 9):
+        reps += [{'key': P('B%d On' % b), 'value': ['Off', 'On']},
+                 {'key': P('B%d Type' % b), 'value': types},
+                 {'key': P('B%d Slope' % b), 'value': slopes}]
 
-    reps = [{'key': P('Clear'), 'value': ['Off', 'On']},
-            {'key': P('Flip Y'), 'value': ['Off', 'On']},
-            {'key': P('Source'), 'value': ['Input', 'Sweep']},
-            {'key': P('Disp Rate'), 'value': ['30 Hz', '15 Hz', '60 Hz']}]
-
+    eq, b14, b58 = eq_tab(), bands_tab(0), bands_tab(4)
     tui = {'pageData': {
         'version': 1,
         'componentDefinitions': {'version': 2, 'importFiles': [], 'localComponentDefinitions': []},
         'replacementStrings': reps,
         'info': {'version': 1, 'type': 'CompleteDescription'},
-        'tabs': [tab('PEN', 0, pen_tab), tab('COLUMNS', 1, cols_tab), tab('OVERLAP', 2, overlap_tab)]}}
+        'tabs': [tab('EQ', 0, eq), tab('BANDS 1-4', 1, b14), tab('BANDS 5-8', 2, b58)]}}
 
-    # Only Output on a knob (Q-Link 13, top left); the triggers and drawing never go on a knob.
-    q = {'Q-Link %d' % k: -1 for k in range(1, 17)}
-    q['Q-Link 13'] = IDX['Output']
-    prog = {'Q-Link %d' % k: -1 for k in range(1, 17)}
-    prog['Q-Link 1'] = IDX['Output']
+    # Q-Links (4 x 4, Q-Link 13 top left). EQ tab and Program mode: Freq / Gain of all 8 bands,
+    # two bands per row. BANDS tabs: one band per row: Freq, Gain, Q, Type.
+    def row_base(r):
+        return 13 - 4 * r
+
+    eq_q = {}
+    for b in range(8):
+        base = row_base(b // 2) + 2 * (b % 2)
+        eq_q['Q-Link %d' % base] = IDX['B%d Freq' % (b + 1)]
+        eq_q['Q-Link %d' % (base + 1)] = IDX['B%d Gain' % (b + 1)]
+
+    def bands_q(first):
+        q = {}
+        for r in range(4):
+            for k, field in enumerate(('Freq', 'Gain', 'Q', 'Type')):
+                q['Q-Link %d' % (row_base(r) + k)] = IDX['B%d %s' % (first + r + 1, field)]
+        return q
+
+    def full(m):
+        return {'Q-Link %d' % k: m.get('Q-Link %d' % k, -1) for k in range(1, 17)}
+
+    prog = {}
+    for b in range(8):
+        prog['Q-Link %d' % (2 * b + 1)] = IDX['B%d Freq' % (b + 1)]
+        prog['Q-Link %d' % (2 * b + 2)] = IDX['B%d Gain' % (b + 1)]
     qlinks = {'version': 4, 'info': {'version': 1, 'type': 'CompleteDescription'},
               'Screen Mode Q-Links': {'version': 4, 'map': [
-                  {'Tab': t, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': dict(q)} for t in (1, 2, 3)]},
-              'Program Mode Q-Links': prog}
+                  {'Tab': 1, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(eq_q)},
+                  {'Tab': 2, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(0))},
+                  {'Tab': 3, 'SubTab': 1, 'Bank Direction': 'Column', 'Q-Links': full(bands_q(4))}]},
+              'Program Mode Q-Links': full(prog)}
 
     os.makedirs(OUT, exist_ok=True)
     json.dump(tui, open(os.path.join(OUT, 'TUI.json'), 'w'), indent=2)
     json.dump(qlinks, open(os.path.join(OUT, 'Q-Links.json'), 'w'), indent=2)
-    print('skins: TUI.json (PEN %d, COLUMNS %d, OVERLAP %d components), Q-Links.json'
-          % (len(pen_tab), len(cols_tab), len(overlap_tab)))
+    print('skins: TUI.json (EQ %d, BANDS 1-4 %d, BANDS 5-8 %d components), Q-Links.json' % (len(eq), len(b14), len(b58)))
 
 
 if __name__ == '__main__':

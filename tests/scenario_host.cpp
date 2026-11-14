@@ -1,17 +1,21 @@
-// scenario_host.cpp - drives the real native plugin build through the VST2 ABI (as the MPC does)
-// and checks the spike's behaviour: pen painting, swipe counting, spectrum display, and how many
-// display updates per second the plugin sends the host.
+// scenario_host.cpp - drives the real native plugin build through the VST2 ABI (as the MPC does):
+// draws a curve with the pen, taps Apply, waits for the fit, and checks that the audio follows
+// the drawing. Also Undo / Redo, Bypass, Clear, the response and spectrum displays, and clicks.
 //
 // Build: c++ -std=c++17 -O2 -I third_party/mpc-plugin-builder-sdk/framework tests/scenario_host.cpp -o build/scenario_host
-// Run:   build/scenario_host plugin/build/native/eq-artist.dylib
+// Run:   build/scenario_host plugin/build/native/eq-artist.dylib [out_dir]
+//        (out_dir gets apply-demo.wav: pink noise, flat for 2 s, then with the drawn EQ applied)
 
 #include "mpc_vst2_abi.h"
 
 #include <dlfcn.h>
+#include <unistd.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -19,19 +23,16 @@ static int g_fail = 0, g_pass = 0;
 #define CHECK(cond, ...) do { if (cond) { ++g_pass; } else { ++g_fail; std::printf("  FAIL %s:%d: ", __FILE__, __LINE__); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
 
 // Parameter indices (plugin/src/EqArtist.cpp).
-enum P { kOutput, kClear, kSource, kRate, kFlipY, kPenX, kPenY, kPenRate, kPenPts, kSwipeCols, kDraw0,
-         kSpec0 = kDraw0 + 32, kNum = kSpec0 + 32 };
+enum P { kOutput, kDraw, kApply, kClear, kUndo, kMaxBands, kAnalyzer, kSpeed, kBypass, kPenX, kPenY, kFitInfo,
+         kBand0, kDraw0 = kBand0 + 48, kSpec0 = kDraw0 + 32, kResp0 = kSpec0 + 32, kNum = kResp0 + 32 };
 static constexpr int kCols = 32;
+static int bandOn(int b) { return kBand0 + b * 6; }
 
-static long g_automate[512] = {};
-static long automateTotal(int from, int to) { long s = 0; for (int i = from; i < to; ++i) s += g_automate[i]; return s; }
-
-static VstIntPtr hostCallback(AEffect*, VstInt32 opcode, VstInt32 index, VstIntPtr, void* ptr, float)
+static VstIntPtr hostCallback(AEffect*, VstInt32 opcode, VstInt32, VstIntPtr, void* ptr, float)
 {
     static VstTimeInfo ti{};
     switch (opcode)
     {
-        case audioMasterAutomate: if (index >= 0 && index < 512) ++g_automate[index]; return 0;
         case audioMasterVersion: return 2400;
         case audioMasterGetTime: ti.sampleRate = 44100.0; ti.tempo = 120.0; ti.flags = kVstTempoValid; return (VstIntPtr)&ti;
         case audioMasterGetVendorString: if (ptr) std::strcpy((char*)ptr, "MPC 3"); return 1;
@@ -44,10 +45,24 @@ typedef AEffect* (*MainProc)(audioMasterCallback);
 static MainProc g_main = nullptr;
 static constexpr double SR = 44100.0;
 
+static double colHz(int c) { return 20.0 * std::pow(1000.0, (c + 0.5) / kCols); }
+
+// The test drawing: a +9 dB bump around 200 Hz, a -8 dB dip around 3 kHz, flat elsewhere.
+static double drawnDb(double hz)
+{
+    const double lo = std::log2(hz / 200.0), hi = std::log2(hz / 3000.0);
+    return 9.0 * std::exp(-lo * lo / 0.5) - 8.0 * std::exp(-hi * hi / 0.3);
+}
+
 struct Plug
 {
     AEffect* e = nullptr;
     double phase = 0.0;
+    std::vector<float> recL, recR;
+    bool recording = false;
+    std::mt19937 rng{5};
+    float b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+
     VstIntPtr disp(VstInt32 op, VstInt32 idx = 0, VstIntPtr v = 0, void* p = nullptr, float o = 0.0f) { return e->dispatcher(e, op, idx, v, p, o); }
     Plug()
     {
@@ -65,119 +80,99 @@ struct Plug
     ~Plug() { disp(effStopProcess); disp(effMainsChanged, 0, 0); disp(effClose); }
     void set(int i, float v) { e->setParameter(e, i, v); }
     float get(int i) { return e->getParameter(e, i); }
+    std::string text(int i) { char buf[256] = {0}; disp(effGetParamDisplay, i, 0, buf); return buf; }
     float drawDb(int c) { return get(kDraw0 + c) * 36.0f - 18.0f; }
+    float respDb(int c) { return get(kResp0 + c) * 36.0f - 18.0f; }
 
-    // One block of a sine at hz (0 = silence), processed in place like the MPC.
-    float lastPeak = 0.0f;
-    void block(double hz, int n = 128, float amp = 0.5f)
+    // One block: a sine at hz, or pink noise when hz < 0, or silence when hz == 0.
+    float lastPeak = 0.0f, maxStep = 0.0f;
+    float prevOut = 0.0f;
+    void block(double hz, int n = 128, float amp = 0.25f)
     {
         std::vector<float> l((size_t)n), r((size_t)n);
+        std::normal_distribution<float> g(0.0f, 0.05f);
         for (int i = 0; i < n; ++i)
         {
-            l[(size_t)i] = r[(size_t)i] = hz > 0 ? amp * (float)std::sin(phase) : 0.0f;
-            phase += 2.0 * M_PI * hz / SR;
+            float v = 0.0f;
+            if (hz > 0) { v = amp * (float)std::sin(phase); phase += 2.0 * M_PI * hz / SR; }
+            else if (hz < 0)
+            {
+                const float w = g(rng);
+                b0 = 0.99886f * b0 + w * 0.0555179f; b1 = 0.99332f * b1 + w * 0.0750759f;
+                b2 = 0.96900f * b2 + w * 0.1538520f; b3 = 0.86650f * b3 + w * 0.3104856f;
+                b4 = 0.55000f * b4 + w * 0.5329522f; b5 = -0.7616f * b5 - w * 0.0168980f;
+                v = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362f;
+                b6 = w * 0.115926f;
+            }
+            l[(size_t)i] = r[(size_t)i] = v;
         }
         float* io[2] = {l.data(), r.data()};
         e->processReplacing(e, io, io, n);
         lastPeak = 0.0f;
-        for (float v : l) lastPeak = std::fmax(lastPeak, std::fabs(v));
+        for (float v : l)
+        {
+            lastPeak = std::fmax(lastPeak, std::fabs(v));
+            maxStep = std::fmax(maxStep, std::fabs(v - prevOut));
+            prevOut = v;
+        }
+        if (recording) { recL.insert(recL.end(), l.begin(), l.end()); recR.insert(recR.end(), r.begin(), r.end()); }
     }
     void run(double sec, double hz = 0.0) { for (int k = 0; k < (int)(sec * SR) / 128; ++k) block(hz); }
+
+    // Steady-state gain at hz, in dB.
+    double gainDb(double hz)
+    {
+        phase = 0.0;
+        run(0.25, hz);
+        float peak = 0.0f;
+        for (int k = 0; k < 40; ++k) { block(hz); peak = std::fmax(peak, lastPeak); }
+        return 20.0 * std::log10(peak / 0.25);
+    }
+
+    // Wait (in real time: the fit runs on its own thread) until Apply has finished.
+    bool waitForFit(double seconds = 3.0)
+    {
+        for (int k = 0; k < (int)(seconds * 200); ++k)
+        {
+            block(0.0);
+            if (text(kFitInfo) != "Fitting...") return true;
+            usleep(5000);
+        }
+        return false;
+    }
 };
 
-static void testPassThrough(Plug& p)
+static void writeWav(const std::string& path, const std::vector<float>& l, const std::vector<float>& r)
 {
-    std::printf("== pass-through at 0 dB Output\n");
-    p.run(0.2, 1000.0);
-    CHECK(std::fabs(p.lastPeak - 0.5f) < 0.01f, "peak %.4f, expected 0.5", p.lastPeak);
+    FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) return;
+    const uint32_t n = (uint32_t)l.size(), data = n * 4, rate = 44100;
+    auto u32 = [&](uint32_t v) { std::fwrite(&v, 4, 1, f); };
+    auto u16 = [&](uint16_t v) { std::fwrite(&v, 2, 1, f); };
+    std::fwrite("RIFF", 1, 4, f); u32(36 + data); std::fwrite("WAVEfmt ", 1, 8, f);
+    u32(16); u16(1); u16(2); u32(rate); u32(rate * 4); u16(4); u16(16);
+    std::fwrite("data", 1, 4, f); u32(data);
+    for (uint32_t i = 0; i < n; ++i)
+        for (float s : {l[i], r[i]}) { const float c = s > 1 ? 1 : (s < -1 ? -1 : s); u16((uint16_t)(int16_t)std::lround(c * 32767.0f)); }
+    std::fclose(f);
 }
 
-static void testPen(Plug& p)
+// Draw the test curve with the pen: one pen point per column, a block between points.
+static void penDraw(Plug& p)
 {
-    std::printf("== pen paints the columns and joins up skipped ones\n");
-    p.set(kClear, 1.0f); p.run(0.05);
-    // A fast stroke left to right: 8 points, each jumping 4 columns, from -12 dB to +12 dB.
-    for (int k = 0; k < 8; ++k)
+    for (int c = 0; c < kCols; ++c)
     {
-        const float x = (k * 4 + 0.5f) / kCols;
-        const float y = (float)k / 7.0f * (24.0f / 36.0f) + (6.0f / 36.0f);   // -12..+12 dB
-        p.set(kPenX, x); p.set(kPenY, y);
+        const double db = drawnDb(colHz(c));
+        p.set(kPenX, (c + 0.5f) / kCols);
+        p.set(kPenY, (float)((db / 18.0 + 1.0) / 2.0));
         p.block(0.0);
     }
-    int painted = 0;
-    for (int c = 0; c <= 28; ++c) if (std::fabs(p.drawDb(c)) > 0.01f) ++painted;
-    CHECK(painted >= 28, "only %d of columns 0..28 painted (gaps not filled)", painted);
-    bool monotonic = true;
-    for (int c = 1; c <= 28; ++c) if (p.drawDb(c) < p.drawDb(c - 1) - 0.06f) monotonic = false;
-    CHECK(monotonic, "a rising stroke should paint a rising curve");
-    CHECK(std::fabs(p.drawDb(0) + 12.0f) < 0.2f && std::fabs(p.drawDb(28) - 12.0f) < 0.2f,
-          "ends at %.2f / %.2f dB, expected -12 / +12", p.drawDb(0), p.drawDb(28));
-    CHECK(std::lround(p.get(kPenPts) * 9999.0f) == 8, "Pen Pts reads %ld, expected 8", std::lround(p.get(kPenPts) * 9999.0f));
-    // Column 31 was never reached.
-    CHECK(std::fabs(p.drawDb(31)) < 0.01f, "column 32 painted (%.2f dB) but the pen never got there", p.drawDb(31));
-
-    std::printf("== a pause starts a new stroke (no line joining the strokes)\n");
-    p.run(0.3);
-    p.set(kPenX, 31.5f / kCols); p.set(kPenY, 1.0f); p.block(0.0);
-    CHECK(std::fabs(p.drawDb(30) - p.drawDb(29)) < 2.0f, "a new stroke joined itself to the old one");
-    CHECK(std::fabs(p.drawDb(31) - 18.0f) < 0.2f, "new stroke's point reads %.2f dB, expected +18", p.drawDb(31));
-
-    std::printf("== Flip Y inverts the pen\n");
-    p.set(kFlipY, 1.0f); p.run(0.3);
-    p.set(kPenX, 10.5f / kCols); p.set(kPenY, 1.0f); p.block(0.0);
-    CHECK(std::fabs(p.drawDb(10) + 18.0f) < 0.2f, "flipped top reads %.2f dB, expected -18", p.drawDb(10));
-    p.set(kFlipY, 0.0f);
-
-    std::printf("== Clear flattens and resets itself\n");
-    p.set(kClear, 1.0f); p.block(0.0);
-    bool flat = true;
-    for (int c = 0; c < kCols; ++c) if (std::fabs(p.drawDb(c)) > 0.01f) flat = false;
-    CHECK(flat, "Clear left a column off 0 dB");
-    CHECK(p.get(kClear) < 0.5f, "Clear did not reset itself");
-}
-
-static void testSwipe(Plug& p)
-{
-    std::printf("== Swipe Cols counts the columns one slider gesture changed\n");
-    p.run(0.5);
-    for (int c = 5; c < 12; ++c) { p.set(kDraw0 + c, 0.7f); p.block(0.0); }   // 7 columns, back to back
-    CHECK(std::lround(p.get(kSwipeCols) * 32.0f) == 7, "reads %ld, expected 7", std::lround(p.get(kSwipeCols) * 32.0f));
-    p.run(0.5);
-    p.set(kDraw0 + 20, 0.2f); p.block(0.0);   // a new gesture after a pause
-    CHECK(std::lround(p.get(kSwipeCols) * 32.0f) == 1, "reads %ld after a single tap, expected 1", std::lround(p.get(kSwipeCols) * 32.0f));
-}
-
-static void testSpectrumAndRate(Plug& p)
-{
-    std::printf("== spectrum display follows the input\n");
-    p.set(kSource, 0.0f);
-    p.run(0.5, 1000.0);
-    int best = 0;
-    for (int c = 1; c < kCols; ++c) if (p.get(kSpec0 + c) > p.get(kSpec0 + best)) best = c;
-    // 1 kHz sits in column 17 of 32 (20 Hz * 1000^(c/32)).
-    CHECK(best >= 16 && best <= 18, "1 kHz lights column %d", best + 1);
-    CHECK(p.get(kSpec0 + 3) < p.get(kSpec0 + best) - 0.3f, "low columns are lit by a 1 kHz sine");
-
-    std::printf("== display updates sent to the host (Source = Sweep, every column moving)\n");
-    for (int rate = 0; rate < 3; ++rate)
-    {
-        p.set(kSource, 1.0f);
-        p.set(kRate, rate / 2.0f);
-        p.run(0.2);
-        const long before = automateTotal(kSpec0, kSpec0 + kCols);
-        p.run(4.0);   // one full sweep pass
-        const double perSec = (automateTotal(kSpec0, kSpec0 + kCols) - before) / 4.0;
-        const char* names[] = {"30 Hz", "15 Hz", "60 Hz"};
-        std::printf("  Disp Rate %s: %.0f spectrum notifications per second\n", names[rate], perSec);
-        CHECK(perSec > 10.0, "the sweep did not move the display");
-    }
-    p.set(kRate, 0.0f);
-    p.set(kSource, 0.0f);
 }
 
 int main(int argc, char** argv)
 {
-    if (argc < 2) { std::fprintf(stderr, "usage: %s <plugin binary>\n", argv[0]); return 2; }
+    if (argc < 2) { std::fprintf(stderr, "usage: %s <plugin binary> [out_dir]\n", argv[0]); return 2; }
+    const std::string outDir = argc > 2 ? argv[2] : "";
     void* lib = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (!lib) { std::fprintf(stderr, "dlopen: %s\n", dlerror()); return 2; }
     g_main = (MainProc)dlsym(lib, "VSTPluginMain");
@@ -186,10 +181,104 @@ int main(int argc, char** argv)
     {
         Plug p;
         CHECK(p.e->numParams == kNum, "plugin has %d params, this host expects %d", p.e->numParams, kNum);
-        testPassThrough(p);
-        testPen(p);
-        testSwipe(p);
-        testSpectrumAndRate(p);
+
+        std::printf("== a fresh instance is flat\n");
+        for (double hz : {100.0, 1000.0, 8000.0})
+        {
+            const double g = p.gainDb(hz);
+            CHECK(std::fabs(g) < 0.05, "%.0f Hz: %.2f dB with no bands", hz, g);
+        }
+        CHECK(p.text(kFitInfo) == "Draw, then Apply", "fit status reads '%s'", p.text(kFitInfo).c_str());
+
+        std::printf("== the pen only paints in Draw mode\n");
+        p.set(kPenX, 0.5f); p.set(kPenY, 1.0f); p.block(0.0);
+        CHECK(std::fabs(p.drawDb(16)) < 0.01f, "the pen painted with Draw off");
+
+        std::printf("== draw a curve, Apply, the audio follows the drawing\n");
+        p.recording = true;
+        p.run(2.0, -1.0);   // pink noise, flat
+        p.set(kDraw, 1.0f); p.block(0.0);
+        penDraw(p);
+        double worstDraw = 0;
+        for (int c = 0; c < kCols; ++c) worstDraw = std::fmax(worstDraw, std::fabs(p.drawDb(c) - drawnDb(colHz(c))));
+        CHECK(worstDraw < 1.0, "the pen drawing is off the intended curve by %.2f dB", worstDraw);
+        p.set(kApply, 1.0f);
+        p.block(-1.0);
+        CHECK(p.waitForFit(), "the fit did not finish within 3 s");
+        p.run(2.0, -1.0);   // pink noise, EQ'd
+        p.recording = false;
+        CHECK(p.get(kDraw) < 0.5f, "Draw is still on after Apply");
+        CHECK(p.get(kApply) < 0.5f, "Apply did not reset itself");
+        int on = 0;
+        for (int b = 0; b < 8; ++b) on += p.get(bandOn(b)) > 0.5f;
+        std::printf("  fit: %s, %d bands on\n", p.text(kFitInfo).c_str(), on);
+        CHECK(on >= 2 && on <= 8, "%d bands on", on);
+        for (int b = 0; b < 8; ++b)
+            if (p.get(bandOn(b)) > 0.5f)
+                std::printf("    B%d %-10s %-10s %-9s Q %s\n", b + 1, p.text(kBand0 + b * 6 + 1).c_str(), p.text(kBand0 + b * 6 + 2).c_str(),
+                            p.text(kBand0 + b * 6 + 3).c_str(), p.text(kBand0 + b * 6 + 4).c_str());
+        double worst = 0, worstHz = 0;
+        for (int c : {4, 8, 11, 13, 15, 18, 20, 22, 24, 26, 30})
+        {
+            const double hz = colHz(c), want = drawnDb(hz), got = p.gainDb(hz);
+            if (std::fabs(got - want) > worst) { worst = std::fabs(got - want); worstHz = hz; }
+        }
+        std::printf("  measured output vs drawing: worst %.2f dB (at %.0f Hz)\n", worst, worstHz);
+        CHECK(worst < 1.5, "the audio misses the drawing by %.2f dB at %.0f Hz", worst, worstHz);
+        double worstResp = 0;
+        for (int c = 0; c < kCols; ++c) worstResp = std::fmax(worstResp, std::fabs(p.respDb(c) - drawnDb(colHz(c))));
+        CHECK(worstResp < 1.6, "the response display misses the drawing by %.2f dB", worstResp);
+        if (!outDir.empty()) writeWav(outDir + "/apply-demo.wav", p.recL, p.recR);
+
+        std::printf("== no click when Apply switches the EQ in\n");
+        // A steady 1 kHz sine; Undo swaps the whole EQ out and back in. The biggest step between
+        // samples during the swaps must stay near the sine's own largest step.
+        p.run(0.3, 1000.0);
+        p.maxStep = 0; p.run(0.3, 1000.0);
+        const float steady = p.maxStep;
+        p.maxStep = 0;
+        p.set(kUndo, 1.0f); p.run(0.2, 1000.0);
+        p.set(kUndo, 1.0f); p.run(0.2, 1000.0);
+        const double ceiling = steady * std::pow(10.0, std::fabs(drawnDb(1000.0)) / 20.0) * 1.3;
+        CHECK(p.maxStep < ceiling, "step %.4f during Undo/Redo, steady-state step %.4f", p.maxStep, steady);
+
+        std::printf("== Undo goes back to flat, Undo again brings the EQ back\n");
+        p.set(kUndo, 1.0f); p.block(0.0);
+        on = 0;
+        for (int b = 0; b < 8; ++b) on += p.get(bandOn(b)) > 0.5f;
+        CHECK(on == 0, "%d bands still on after Undo", on);
+        CHECK(std::fabs(p.gainDb(200.0)) < 0.1, "not flat after Undo");
+        p.set(kUndo, 1.0f); p.block(0.0);
+        CHECK(std::fabs(p.gainDb(200.0) - drawnDb(200.0)) < 1.5, "Redo did not bring the bump back");
+
+        std::printf("== Bypass\n");
+        p.set(kBypass, 1.0f);
+        CHECK(std::fabs(p.gainDb(200.0)) < 0.05, "bypassed but %.2f dB at 200 Hz", p.gainDb(200.0));
+        p.set(kBypass, 0.0f);
+
+        std::printf("== Draw starts from the curve you hear; Clear flattens the drawing\n");
+        p.set(kDraw, 1.0f); p.block(0.0);
+        double worstStart = 0;
+        for (int c = 0; c < kCols; ++c) worstStart = std::fmax(worstStart, std::fabs(p.drawDb(c) - p.respDb(c)));
+        CHECK(worstStart < 1.0, "Draw started %.2f dB away from the response", worstStart);
+        p.set(kClear, 1.0f); p.block(0.0);
+        bool flat = true;
+        for (int c = 0; c < kCols; ++c) flat = flat && std::fabs(p.drawDb(c)) < 0.01f;
+        CHECK(flat, "Clear left the drawing bent");
+        p.set(kApply, 1.0f); p.block(0.0);
+        CHECK(p.waitForFit(), "the second fit did not finish");
+        CHECK(std::fabs(p.gainDb(200.0)) < 0.1, "applying a flat drawing is not flat");
+        CHECK(p.text(kFitInfo) == "Flat: no bands", "fit status reads '%s'", p.text(kFitInfo).c_str());
+
+        std::printf("== the spectrum display follows the input\n");
+        p.run(0.5, 1000.0);
+        int best = 0;
+        for (int c = 1; c < kCols; ++c) if (p.get(kSpec0 + c) > p.get(kSpec0 + best)) best = c;
+        CHECK(best == 18, "1 kHz lights column %d, expected 19 (976..1210 Hz)", best + 1);
+        p.set(kAnalyzer, 0.0f); p.run(0.2, 1000.0);
+        bool dark = true;
+        for (int c = 0; c < kCols; ++c) dark = dark && p.get(kSpec0 + c) == 0.0f;
+        CHECK(dark, "Analyzer Off still shows a spectrum");
     }
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;

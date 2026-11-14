@@ -1,25 +1,27 @@
-// Slow Ops EQ Artist: SPIKE BUILD (Phase 0, drawing-surface hardware test).
+// Slow Ops EQ Artist: draw an EQ curve over a live spectrum, then Apply it as real bands.
 //
-// Audio passes through (with an Output gain). The point of this build is to answer, on the MPC:
-//   (a) Does dragging an XYPad deliver Pen X / Pen Y smoothly, and how many updates per second?
-//       The PEN tab paints the 32 Draw columns from the pen, joining up skipped columns.
-//   (b) Does one swipe across a row of vertical sliders move several of them, or only the first?
-//       The COLUMNS tab counts how many different columns one gesture changed ("Swipe cols").
-//   (c) When an XYPad sits on top of the sliders, which one gets the touch? (OVERLAP tab.)
-//   (d) Is the redraw smooth with 64 read-only/drawn params updating at 15 / 30 / 60 Hz?
-//       Source = Sweep moves a bump across all 32 spectrum columns without any audio.
-// See docs/SPIKE.md for the checklist.
-//
-// DSP lives in core/include/slowops/eqartist/ (standard library only, no SDK dependency).
+// This file is the thin adapter between the MPC Plugin Builder SDK and the DSP in
+// core/include/slowops/eqartist/ (standard library only, no SDK dependency). It:
+//   * declares the parameters (ids are permanent once released; see docs/CONTROLS.md),
+//   * paints the 32 Draw columns from the pen (an XYPad over the graph, bound to Pen X / Pen Y),
+//   * turns the self-resetting Apply / Clear / Undo buttons into actions,
+//   * sends the drawing to the curve fitter (on its own thread) and writes the fitted bands
+//     into the band parameters, so knobs, Q-Links, automation and the project all see them,
+//   * runs the EQ engine, and writes the spectrum and the EQ's response curve into read-only
+//     parameters about 30 times a second.
 
 #include "mpc_plugin.h"
 
+#include "../../core/include/slowops/eqartist/EqEngine.hpp"
+#include "../../core/include/slowops/eqartist/FitWorker.hpp"
 #include "../../core/include/slowops/eqartist/Spectrum.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 
 namespace eq = slowops::eqartist;
@@ -28,87 +30,112 @@ class EqArtist : public mpc::Plugin
 {
 public:
     static constexpr int kCols = 32;
+    static constexpr int kBands = eq::EqEngine::kNumBands;
+    static constexpr int kPerBand = 6;
     static constexpr float kDrawRangeDb = 18.0f;
     static constexpr float kSpecTopDb = -6.0f, kSpecBottomDb = -66.0f;
-    static constexpr int kSpecFrames = 36;    // must match the spec_bar.png film strip
+    static constexpr int kSpecFrames = 36;    // must match spec_bar.png (scripts/skin_layout.py)
+    static constexpr int kDotFrames = 37;     // must match dot.png: -18..+18 dB in 1 dB steps
 
-    // Parameter indices. Ids are permanent once released; this is a spike, so they may still change.
+    // Parameter indices. The ids are permanent once released: only ever append.
     enum
     {
-        kOutput,     // index 0: the MPC nudges it on every prepare, so it is harmless
-        kClear,      // trigger: flatten the drawing
-        kSource,     // Input / Sweep
-        kRate,       // display rate: 30 / 15 / 60 Hz
-        kFlipY,      // invert the pen's vertical direction
-        kPenX,       // XYPad position (input, not automatable)
+        kOutput,      // index 0: the MPC nudges it on every prepare, so it is harmless
+        kDraw,        // Draw mode: the pen paints the curve
+        kApply,       // trigger: fit the drawing to bands
+        kClear,       // trigger: flatten the drawing
+        kUndo,        // trigger: back to the bands before the last Apply (press again to redo)
+        kMaxBands,    // 1..8: how many bands Apply may use
+        kAnalyzer,    // Off / Pre / Post
+        kSpeed,       // analyser fall: Slow / Medium / Fast
+        kBypass,
+        kPenX,        // the pen XYPad (input only)
         kPenY,
-        kPenRate,    // read-only: pen updates in the last second
-        kPenPts,     // read-only: pen points in the current stroke
-        kSwipeCols,  // read-only: columns changed by the last slider gesture
-        kDraw0,
+        kFitInfo,     // read-only: its value text is the fit status
+        kBand0,       // per band: On, Type, Freq, Gain, Q, Slope
+        kDraw0 = kBand0 + kBands * kPerBand,
         kSpec0 = kDraw0 + kCols,
-        kNumParams = kSpec0 + kCols
+        kResp0 = kSpec0 + kCols,
+        kNumParams = kResp0 + kCols
     };
+    enum { kOn, kType, kFreq, kGain, kQ, kSlope };
+    static int bandParam(int band, int field) { return kBand0 + band * kPerBand + field; }
 
     EqArtist() : mpc::Plugin(makeInfo())
     {
         addParam(mpc::floatParam("output", "Output", -24.0f, 12.0f, 0.0f, "dB", 1));
+        addParam(mpc::boolParam("draw", "Draw", false));
+        addParam(mpc::boolParam("apply", "Apply", false));
         addParam(mpc::boolParam("clear", "Clear", false));
-        addParam(mpc::choiceParam("source", "Source", {"Input", "Sweep"}, 0));
-        addParam(mpc::choiceParam("rate", "Disp Rate", {"30 Hz", "15 Hz", "60 Hz"}, 0));
-        addParam(mpc::boolParam("flipy", "Flip Y", false));
+        addParam(mpc::boolParam("undo", "Undo", false));
+        addParam(mpc::intParam("maxbands", "Max Bands", 1, kBands, kBands));
+        addParam(mpc::choiceParam("analyzer", "Analyzer", {"Off", "Pre", "Post"}, 1));
+        addParam(mpc::choiceParam("speed", "Speed", {"Slow", "Medium", "Fast"}, 1));
+        addParam(mpc::boolParam("bypass", "Bypass", false));
         addDisplay(mpc::floatParam("penx", "Pen X", 0.0f, 1.0f, 0.5f, "", 3));
         addDisplay(mpc::floatParam("peny", "Pen Y", 0.0f, 1.0f, 0.5f, "", 3));
-        addDisplay(mpc::intParam("penrate", "Pen Rate", 0, 1000, 0, "/s"));
-        addDisplay(mpc::intParam("penpts", "Pen Pts", 0, 9999, 0));
-        addDisplay(mpc::intParam("swipecols", "Swipe Cols", 0, kCols, 0));
+        addDisplay(mpc::intParam("fitinfo", "Fit", 0, 99, 0));
+        static const float defaultHz[kBands] = {60, 150, 400, 1000, 2500, 5000, 9000, 14000};
+        for (int b = 0; b < kBands; ++b)
+        {
+            const std::string n = std::to_string(b + 1), id = "b" + n, name = "B" + n + " ";
+            addParam(mpc::boolParam((id + "on").c_str(), (name + "On").c_str(), false));
+            addParam(mpc::choiceParam((id + "type").c_str(), (name + "Type").c_str(),
+                                      {"Bell", "Low Shelf", "High Shelf", "Low Cut", "High Cut", "Notch", "Band Pass", "Tilt"}, 0));
+            addParam(mpc::logParam((id + "freq").c_str(), (name + "Freq").c_str(), 20.0f, 20000.0f, defaultHz[b], "Hz", 0));
+            addParam(mpc::floatParam((id + "gain").c_str(), (name + "Gain").c_str(), -24.0f, 24.0f, 0.0f, "dB", 1));
+            addParam(mpc::logParam((id + "q").c_str(), (name + "Q").c_str(), 0.1f, 18.0f, 1.0f, "", 2));
+            addParam(mpc::choiceParam((id + "slope").c_str(), (name + "Slope").c_str(),
+                                      {"6 dB", "12 dB", "18 dB", "24 dB", "36 dB", "48 dB"}, 1));
+        }
         for (int c = 0; c < kCols; ++c)
         {
             const std::string n = std::to_string(c + 1);
-            addParam(mpc::floatParam(("draw" + n).c_str(), ("Draw " + n).c_str(), -kDrawRangeDb, kDrawRangeDb, 0.0f, "dB", 1));
+            // Not automatable: the drawing is edited with the pen and saved with the project.
+            addDisplay(mpc::floatParam(("draw" + n).c_str(), ("Draw " + n).c_str(), -kDrawRangeDb, kDrawRangeDb, 0.0f, "dB", 1));
         }
         for (int c = 0; c < kCols; ++c)
         {
             const std::string n = std::to_string(c + 1);
             addDisplay(mpc::floatParam(("spec" + n).c_str(), ("Spec " + n).c_str(), 0.0f, 1.0f, 0.0f, "", 3));
         }
+        for (int c = 0; c < kCols; ++c)
+        {
+            const std::string n = std::to_string(c + 1);
+            addDisplay(mpc::floatParam(("resp" + n).c_str(), ("Resp " + n).c_str(), -kDrawRangeDb, kDrawRangeDb, 0.0f, "dB", 1));
+        }
         if (numParams() != kNumParams) mpc::log("EqArtist: parameter count mismatch");
+        for (int c = 0; c < kCols; ++c) colHz_[(std::size_t)c] = 20.0 * std::pow(1000.0, (c + 0.5) / kCols);
     }
 
     void prepare(double sampleRate, int maxBlockSize) override
     {
         (void)maxBlockSize;
-        spectrum_.prepare(sampleRate, kCols);   // the only allocation
+        spectrum_.prepare(sampleRate, kCols);   // allocates
+        pullBands();
+        engine_.prepare(sampleRate);
         penGapSamples_ = (int)(0.15 * sampleRate);
-        swipeGapSamples_ = (int)(0.4 * sampleRate);
-        oneSecond_ = (int)sampleRate;
-        gain_ = targetGain();
+        displayEvery_ = (int)(sampleRate / 30.0);
+        respDirty_ = true;
     }
 
-    // Also called after a state load. Restoring Pen X / Pen Y or the Draw columns from a project
-    // must not count as a pen stroke or a slider gesture, so drop the pending events.
+    // Also called after a state load. Restoring Pen X / Pen Y from a project must not count as a
+    // pen stroke, and the triggers must not fire.
     void reset() override
     {
-        if (getBool(kClear)) setNormalised(kClear, 0.0f);
+        for (int t : {kApply, kClear, kUndo}) if (getBool(t)) setNormalised(t, 0.0f);
         lastPenSeq_ = penSeq_.load(std::memory_order_relaxed);
-        lastSwipeSeq_ = uiDrawSeq_.load(std::memory_order_relaxed);
-        uiDrawMask_.store(0, std::memory_order_relaxed);
         lastCol_ = -1;
-        sincePen_ = sinceSwipe_ = 1 << 30;
+        sincePen_ = 1 << 30;
+        wasDraw_ = getBool(kDraw);
+        engine_.reset();
+        respDirty_ = true;
     }
 
     void parameterChanged(int index, float plain) override
     {
         (void)plain;
-        if (index == kPenX || index == kPenY)
-        {
-            penSeq_.fetch_add(1, std::memory_order_relaxed);
-        }
-        else if (index >= kDraw0 && index < kDraw0 + kCols && !selfWrite_)
-        {
-            uiDrawMask_.fetch_or(1u << (index - kDraw0), std::memory_order_relaxed);
-            uiDrawSeq_.fetch_add(1, std::memory_order_relaxed);
-        }
+        if (index == kPenX || index == kPenY) penSeq_.fetch_add(1, std::memory_order_relaxed);
     }
 
     void process(mpc::ProcessContext& ctx) override
@@ -118,55 +145,76 @@ public:
         const float* inR = ctx.numInputs > 1 ? ctx.inputs[1] : inL;
         float* outL = ctx.outputs[0];
         float* outR = ctx.numOutputs > 1 ? ctx.outputs[1] : ctx.outputs[0];
+        if (!inL) { for (int i = 0; i < n; ++i) outL[i] = outR[i] = 0.0f; return; }
 
+        handleDrawToggle();
         handleTriggers();
         handlePen(n);
-        handleSwipe(n);
+        handleFitResult();
+        pullBands();
 
-        // Pass-through with a smoothed output gain; the analyser sees the input.
-        const float target = targetGain();
-        const float step = (target - gain_) / (float)std::max(1, n);
-        for (int i = 0; i < n; ++i)
-        {
-            const float l = inL ? inL[i] : 0.0f;
-            const float r = inR ? inR[i] : 0.0f;
-            spectrum_.push(0.5f * (l + r));
-            gain_ += step;
-            outL[i] = l * gain_;
-            if (outR != outL) outR[i] = r * gain_;
-        }
-        gain_ = target;
+        const int analyzer = getInt(kAnalyzer);
+        if (analyzer == 1) for (int i = 0; i < n; ++i) spectrum_.push(0.5f * (inL[i] + inR[i]));
+        engine_.setOutputDb(get(kOutput));
+        engine_.setBypass(getBool(kBypass));
+        engine_.process(inL, inR, outL, outR, n);   // in place is fine
+        if (analyzer == 2) for (int i = 0; i < n; ++i) spectrum_.push(0.5f * (outL[i] + outR[i]));
 
         displayAge_ += n;
-        sweepT_ = (sweepT_ + n) % (int64_t)(sampleRate() * 4.0);   // one sweep pass = 4 s
-        const int every = (int)(sampleRate() / displayHz());
-        if (displayAge_ >= every)
+        if (displayAge_ >= displayEvery_)
         {
             const float secs = (float)displayAge_ / (float)sampleRate();
             displayAge_ = 0;
-            updateSpectrum(secs);
-        }
-        rateAge_ += n;
-        if (rateAge_ >= oneSecond_)
-        {
-            rateAge_ = 0;
-            setDisplay(kPenRate, param(kPenRate).toNormalised((float)std::min(1000, penEventsThisSecond_)));
-            penEventsThisSecond_ = 0;
+            updateDisplays(analyzer, secs);
         }
     }
 
+    bool formatValue(int index, float plain, std::string& out) override
+    {
+        char buf[64];
+        if (index == kFitInfo)
+        {
+            const int st = fitState_.load();
+            if (st == kFitBusy) out = "Fitting...";
+            else if (st == kFitNone) out = "Draw, then Apply";
+            else
+            {
+                const int nb = fitBands_.load();
+                if (nb == 0) std::snprintf(buf, sizeof(buf), "Flat: no bands");
+                else std::snprintf(buf, sizeof(buf), "%d band%s, %.1f dB off", nb, nb == 1 ? "" : "s", (double)fitRms_.load());
+                out = buf;
+            }
+            return true;
+        }
+        if (index >= kBand0 && index < kDraw0)
+        {
+            const int field = (index - kBand0) % kPerBand;
+            if (field == kFreq)
+            {
+                if (plain < 1000.0f) std::snprintf(buf, sizeof(buf), "%.0f Hz", (double)plain);
+                else std::snprintf(buf, sizeof(buf), "%.2f kHz", (double)plain / 1000.0);
+                out = buf;
+                return true;
+            }
+            if (field == kGain) { std::snprintf(buf, sizeof(buf), "%+.1f dB", (double)plain); out = buf; return true; }
+        }
+        return false;
+    }
+
 private:
+    enum { kFitNone, kFitBusy, kFitDone };
+
     static mpc::PluginInfo makeInfo()
     {
         mpc::PluginInfo info;
         info.name = "EQ Artist";
         info.vendor = "Slow Ops";
         info.uniqueId = MPC_FOURCC('S', 'o', 'E', 'q');
-        info.version = 100;   // 0.1.0
+        info.version = 200;   // 0.2.0
         info.isInstrument = false;
         info.numInputs = 2;
         info.numOutputs = 2;
-        info.tailSamples = 1;
+        info.tailSamples = 0;
         return info;
     }
 
@@ -177,53 +225,145 @@ private:
     }
 
     // Write a parameter from the plugin and tell the host, only when it changed.
-    void setDisplay(int i, float norm)
+    void setValue(int i, float norm)
     {
         if (getNormalised(i) == norm) return;
-        selfWrite_ = true;
         setNormalised(i, norm);
-        selfWrite_ = false;
         notifyHostParameterChanged(i);
     }
+    void setPlain(int i, float plain) { setValue(i, param(i).toNormalised(plain)); }
 
-    float targetGain() const { return std::pow(10.0f, get(kOutput) / 20.0f); }
-
-    double displayHz() const
+    // ---- bands <-> parameters ---------------------------------------------------------------
+    eq::BandParams readBand(int b) const
     {
-        switch (getInt(kRate)) { case 1: return 15.0; case 2: return 60.0; default: return 30.0; }
+        eq::BandParams p;
+        p.on = getBool(bandParam(b, kOn));
+        p.type = (eq::BandType)std::clamp(getInt(bandParam(b, kType)), 0, (int)eq::BandType::Count - 1);
+        p.freq = get(bandParam(b, kFreq));
+        p.gainDb = get(bandParam(b, kGain));
+        p.q = get(bandParam(b, kQ));
+        p.slope = std::clamp(getInt(bandParam(b, kSlope)), 0, eq::kNumSlopes - 1);
+        return p;
+    }
+
+    void pullBands()
+    {
+        for (int b = 0; b < kBands; ++b)
+        {
+            const eq::BandParams p = readBand(b);
+            if (!(p == engine_.band(b))) { engine_.setBand(b, p); respDirty_ = true; }
+        }
+    }
+
+    void writeBand(int b, const eq::BandParams& p)
+    {
+        setPlain(bandParam(b, kOn), p.on ? 1.0f : 0.0f);
+        if (!p.on) return;   // an unused band keeps its last settings, switched off
+        setPlain(bandParam(b, kType), (float)(int)p.type);
+        setPlain(bandParam(b, kFreq), (float)p.freq);
+        setPlain(bandParam(b, kGain), eq::typeHasGain(p.type) ? (float)p.gainDb : 0.0f);
+        setPlain(bandParam(b, kQ), (float)p.q);
+        setPlain(bandParam(b, kSlope), (float)p.slope);
+    }
+
+    // ---- Draw / Apply / Clear / Undo -------------------------------------------------------------
+    // Turning Draw on starts the drawing from the curve you hear, so a redraw edits it.
+    void handleDrawToggle()
+    {
+        const bool d = getBool(kDraw);
+        if (d && !wasDraw_)
+        {
+            double db[kCols];
+            engine_.responseDb(colHz_.data(), db, kCols);
+            for (int c = 0; c < kCols; ++c) paint(c, (float)db[c]);
+            lastCol_ = -1;
+        }
+        wasDraw_ = d;
     }
 
     void handleTriggers()
     {
         if (getBool(kClear))
         {
-            setDisplay(kClear, 0.0f);
-            for (int c = 0; c < kCols; ++c) setDisplay(kDraw0 + c, param(kDraw0 + c).toNormalised(0.0f));
+            setValue(kClear, 0.0f);
+            for (int c = 0; c < kCols; ++c) paint(c, 0.0f);
+        }
+        if (getBool(kApply))
+        {
+            setValue(kApply, 0.0f);
+            double db[kCols];
+            for (int c = 0; c < kCols; ++c) db[c] = get(kDraw0 + c);
+            if (fit_.request(colHz_.data(), db, kCols, getInt(kMaxBands)))
+            {
+                fitState_.store(kFitBusy);
+                bumpFitInfo();
+            }
+        }
+        if (getBool(kUndo))
+        {
+            setValue(kUndo, 0.0f);
+            if (hasUndo_)
+            {
+                // Swap the current bands with the saved ones, so Undo again is Redo.
+                for (int i = 0; i < kBands * kPerBand; ++i)
+                {
+                    const float cur = getNormalised(kBand0 + i);
+                    setValue(kBand0 + i, undo_[(std::size_t)i]);
+                    undo_[(std::size_t)i] = cur;
+                }
+                engine_.forceCrossfade();
+            }
         }
     }
 
-    // Pen: each new X/Y pair paints the column under X with the gain at Y. Columns skipped since
-    // the previous point of the same stroke are filled by straight-line interpolation. A pause
-    // longer than penGapSamples_ starts a new stroke.
+    void handleFitResult()
+    {
+        eq::FitResult r;
+        if (!fit_.take(r)) return;
+        for (int i = 0; i < kBands * kPerBand; ++i) undo_[(std::size_t)i] = getNormalised(kBand0 + i);
+        hasUndo_ = true;
+        for (int b = 0; b < kBands; ++b)
+        {
+            eq::BandParams p = b < r.count ? r.bands[(std::size_t)b] : eq::BandParams{};
+            if (b >= r.count) p.on = false;
+            writeBand(b, p);
+        }
+        engine_.forceCrossfade();
+        fitBands_.store(r.count);
+        fitRms_.store((float)r.rmsDb);
+        fitState_.store(kFitDone);
+        bumpFitInfo();
+        setValue(kDraw, 0.0f);   // show the result
+        wasDraw_ = false;
+    }
+
+    // The fit status is the value text of a counter parameter: changing the value makes the MPC
+    // ask for the text again.
+    void bumpFitInfo()
+    {
+        fitCounter_ = (fitCounter_ + 1) % 100;
+        setValue(kFitInfo, (float)fitCounter_ / 99.0f);
+    }
+
+    // ---- pen ----------------------------------------------------------------------------------
+    // Each new X/Y pair paints the column under X with the gain at Y. Columns skipped since the
+    // previous point of the same stroke are filled by straight-line interpolation. A pause longer
+    // than penGapSamples_ starts a new stroke. The pen only paints in Draw mode.
     void handlePen(int n)
     {
         sincePen_ = std::min(sincePen_ + n, 1 << 30);
         const uint32_t seq = penSeq_.load(std::memory_order_relaxed);
         if (seq == lastPenSeq_) return;
-        penEventsThisSecond_ += (int)(seq - lastPenSeq_);
         lastPenSeq_ = seq;
+        if (!getBool(kDraw)) return;
 
         const bool newStroke = sincePen_ > penGapSamples_;
         sincePen_ = 0;
-        const float x = getNormalised(kPenX);
-        float y = getNormalised(kPenY);
-        if (getBool(kFlipY)) y = 1.0f - y;
+        const float x = getNormalised(kPenX), y = getNormalised(kPenY);
         const int col = std::clamp((int)(x * kCols), 0, kCols - 1);
         const float db = (y * 2.0f - 1.0f) * kDrawRangeDb;
-
         if (newStroke || lastCol_ < 0)
         {
-            strokePts_ = 0;
             paint(col, db);
         }
         else
@@ -236,74 +376,57 @@ private:
         }
         lastCol_ = col;
         lastDb_ = db;
-        ++strokePts_;
-        setDisplay(kPenPts, param(kPenPts).toNormalised((float)std::min(9999, strokePts_)));
     }
 
-    void paint(int col, float db)
-    {
-        setDisplay(kDraw0 + col, param(kDraw0 + col).toNormalised(std::clamp(db, -kDrawRangeDb, kDrawRangeDb)));
-    }
+    void paint(int col, float db) { setPlain(kDraw0 + col, std::clamp(db, -kDrawRangeDb, kDrawRangeDb)); }
 
-    // Slider gestures: collect the columns the UI changed until it has been quiet for 0.4 s.
-    // The live count shows during the gesture; it stays on screen after it.
-    void handleSwipe(int n)
+    // ---- displays -----------------------------------------------------------------------------
+    void updateDisplays(int analyzer, float secs)
     {
-        sinceSwipe_ = std::min(sinceSwipe_ + n, 1 << 30);
-        const uint32_t seq = uiDrawSeq_.load(std::memory_order_relaxed);
-        if (seq != lastSwipeSeq_)
-        {
-            lastSwipeSeq_ = seq;
-            if (sinceSwipe_ > swipeGapSamples_) swipeMask_ = 0;
-            sinceSwipe_ = 0;
-            swipeMask_ |= uiDrawMask_.exchange(0, std::memory_order_relaxed);
-            int count = 0;
-            for (uint32_t m = swipeMask_; m; m &= m - 1) ++count;
-            setDisplay(kSwipeCols, param(kSwipeCols).toNormalised((float)count));
-        }
-    }
-
-    void updateSpectrum(float secs)
-    {
-        const bool sweep = getInt(kSource) == 1;
-        if (!sweep) spectrum_.analyse(24.0f, secs);
-        const double t = (double)sweepT_ / sampleRate();
-        const double centre = t / 4.0 * (kCols + 8) - 4.0;
+        static const float kFall[3] = {12.0f, 24.0f, 48.0f};
+        if (analyzer != 0) spectrum_.analyse(kFall[std::clamp(getInt(kSpeed), 0, 2)], secs);
         for (int c = 0; c < kCols; ++c)
         {
-            float db;
-            if (sweep)
+            float v = 0.0f;
+            if (analyzer != 0)
             {
-                const double d = (c - centre) / 3.0;
-                db = (float)(kSpecBottomDb + 6.0 + 54.0 * std::exp(-d * d));
+                v = (spectrum_.columnDb(c) - kSpecBottomDb) / (kSpecTopDb - kSpecBottomDb);
+                v = std::round(std::clamp(v, 0.0f, 1.0f) * (kSpecFrames - 1)) / (float)(kSpecFrames - 1);
             }
-            else
+            setValue(kSpec0 + c, v);   // only notifies when the bar height changes
+        }
+        if (respDirty_)
+        {
+            respDirty_ = false;
+            double db[kCols];
+            engine_.responseDb(colHz_.data(), db, kCols);
+            for (int c = 0; c < kCols; ++c)
             {
-                db = spectrum_.columnDb(c);
+                // Snap to the dot film strip's 1 dB frames.
+                const float d = std::clamp((float)db[c], -kDrawRangeDb, kDrawRangeDb);
+                const float norm = std::round((d + kDrawRangeDb) / (2.0f * kDrawRangeDb) * (kDotFrames - 1)) / (float)(kDotFrames - 1);
+                setValue(kResp0 + c, norm);
             }
-            float v = (db - kSpecBottomDb) / (kSpecTopDb - kSpecBottomDb);
-            v = std::clamp(v, 0.0f, 1.0f);
-            v = std::round(v * (kSpecFrames - 1)) / (float)(kSpecFrames - 1);   // only notify on a frame change
-            setDisplay(kSpec0 + c, v);
         }
     }
 
+    eq::EqEngine engine_;
     eq::Spectrum spectrum_;
-    float gain_ = 1.0f;
-    int displayAge_ = 0, rateAge_ = 0, oneSecond_ = 44100;
-    int64_t sweepT_ = 0;
+    eq::FitWorker fit_;
+    std::array<double, kCols> colHz_{};
+    int displayAge_ = 0, displayEvery_ = 1470;
+    bool respDirty_ = true, wasDraw_ = false;
 
     std::atomic<uint32_t> penSeq_{0};
     uint32_t lastPenSeq_ = 0;
-    int penEventsThisSecond_ = 0, sincePen_ = 1 << 30, penGapSamples_ = 6615;
-    int lastCol_ = -1, strokePts_ = 0;
+    int sincePen_ = 1 << 30, penGapSamples_ = 6615, lastCol_ = -1;
     float lastDb_ = 0.0f;
 
-    std::atomic<uint32_t> uiDrawMask_{0}, uiDrawSeq_{0};
-    uint32_t lastSwipeSeq_ = 0, swipeMask_ = 0;
-    int sinceSwipe_ = 1 << 30, swipeGapSamples_ = 17640;
-
-    bool selfWrite_ = false;
+    std::array<float, kBands * kPerBand> undo_{};
+    bool hasUndo_ = false;
+    std::atomic<int> fitState_{kFitNone}, fitBands_{0};
+    std::atomic<float> fitRms_{0.0f};
+    int fitCounter_ = 0;
 };
 
 MPC_PLUGIN_ENTRY(EqArtist)

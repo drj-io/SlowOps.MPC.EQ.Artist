@@ -11,5 +11,5 @@ echo; echo "== core tests"; ./build/core_tests
 echo; echo "== SDK host simulator"
 "$SDK/.sdk-tools/host_sim" "$LIB" test --seconds 4 --wav plugin/build/hostsim.wav
 echo; echo "== scenario host (real plugin binary)"
-./build/scenario_host "$LIB"
+./build/scenario_host "$LIB" plugin/build
 echo; echo "ALL CHECKS PASSED"

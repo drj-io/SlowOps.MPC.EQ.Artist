@@ -82,7 +82,8 @@ Record pass / fail and a note for each. Tested on: _MPC model, MPC OS version, d
 
 ## Results
 
-_Not tested on hardware yet._
+MPC Live III, MPC OS 3.10.1.12, 2026-11-14: **the pen (PEN tab) is the drawing surface.** The user
+preferred it to the column sliders. The numeric checks (PEN /S, Swipe Cols, redraw rate) were not recorded.
 
 ## Desktop results (scenario host, 2026-11-14)
 
