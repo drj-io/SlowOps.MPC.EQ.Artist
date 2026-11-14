@@ -1,0 +1,1 @@
+# MPC.EQ.Artist
