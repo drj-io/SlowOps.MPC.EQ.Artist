@@ -1,0 +1,16 @@
+{
+  "name": "EQ Artist Lines",
+  "manufacturer": "Slow Ops",
+  "version": "1.0.0",
+  "format": "vst2",
+  "kind": "effect",
+  "uid": "SoEL",
+  "numInputs": 2,
+  "numOutputs": 2,
+  "category": "Effect",
+  "file32": "VST/eqartist-lines-arm32.so",
+  "file64": "VST/eqartist-lines-arm64.so",
+  "description": "An 8-band EQ you edit by dragging band nodes (PARA) or by drawing the curve (DRAW), over a live spectrum. Curves are drawn as connected lines. Experimental: the screen updates much more slowly than EQ Artist Dots.",
+  "author": "Slow Ops",
+  "license": "MIT"
+}

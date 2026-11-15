@@ -171,3 +171,34 @@ their node.
 |---|---|---|---|
 | Q21 | v0.5.6, LINE: drag a node; smooth enough? | | |
 | Q22 | DOTS: dragging speed | | |
+
+## 0.6.0: PARA wired to the sound; two plugins
+
+LINE dragging worked on the MPC at 76 columns (0.5.6: "Lines work"; the analyzer felt a bit slow, left for
+later). 0.6.0 then:
+
+- **One EQ.** PARA's silent test bands are gone: PARA edits the engine's eight bands, the same ones DRAW's
+  fit writes. *Bands* is the count (bands 1 … count are on). A stroke on DRAW sets the bands and the count
+  and clears the selection; a PARA edit redraws DRAW's drawing after 0.3 s. Both pages show the same
+  "EQ you hear" curve, which shows the live EQ's response while a stroke sounds.
+- **Two plugins from one codebase:** EQ Artist Dots (curves as 64 dot columns; PARA shows about 380 widgets)
+  and EQ Artist Lines (curves as 76 line columns of 3 tiles; PARA shows about 590, the count that dragged
+  well). The STYLE switch is gone. Code: `plugin-common/` plus two few-line projects in `plugins/`.
+- Desktop: both pass 56 end-to-end checks each (a dragged node measures +6.00 dB where the node says +6).
+
+| # | Check (each plugin) | Dots | Lines | Notes |
+|---|---|---|---|---|
+| R1 | The corner reads the plugin's name and v0.6.0 | | | |
+| R2 | PARA: drag a node and hear the EQ change | | | |
+| R3 | DRAW: draw a curve; PARA then shows nodes on it | | | |
+| R4 | PARA edit, then DRAW: the drawing matches | | | |
+| R5 | + / −, TYPE, Q, SLOPE, NONE, UNDO, CLEAR, BYPASS | | | |
+| R6 | How dragging feels; opening time; memory | | | |
+
+## 1.0.0
+
+Released after the checks on the Live III (EQ Artist Dots, 0.7.3: the PARA page in
+[images/para-page.png](images/para-page.png)). Between 0.6.0 and 1.0.0: DRAW's top row and analyzer settings on
+PARA, the 3 x 2 TYPE grid, focus rings and the data wheel on every setting, one GAIN / SLOPE knob, a cut's node
+height as its resonance and a notch's as its depth, UNDO for PARA edits, and one band count for both pages.
+EQ Artist Lines ships as experimental: on the MPC its screen updates far more slowly than Dots.

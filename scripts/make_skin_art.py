@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Draw the skin PNGs into plugin/skins/. Standard library only (zlib + struct PNG writer).
+"""Draw the text-free skin PNGs into plugins/<EQA_VARIANT>/skins/. Standard library only (zlib + struct
+PNG writer).
 
 The PNGs are committed, so a normal build does not run this. Rerun it when the layout or the
 palette in skin_layout.py changes.
 
   bg.png        1280 x 628   page, graph panel, grid
   spec_bar.png  38 x (432 x 36)  spectrum column film strip: frame k = bar k/35 of the graph tall
-  dot.png       38 x (432 x 37)  curve film strip (drawing and response): frame k = a dot at -18 + k dB
   puck.png      40 x 40      pen XYPad puck (a ring)
   draw_dot.png  38 x (432 x 37)  the drawing: a smaller, dimmer dot (frame k = -18 + k dB)
 
 Text (button labels, graph axis labels on bg.png) comes from make_text_art.py (needs Pillow),
 which must run after this script. knob_uni.png is the SDK kit knob in our purple:
-  python3 third_party/mpc-plugin-builder-sdk/tools/make_ui_kit.py --out plugin/skins --accent ff9971c0 --only knob_uni
+  python3 third_party/mpc-plugin-builder-sdk/tools/make_ui_kit.py --out plugins/<variant>/skins --accent ff9971c0 --only knob_uni
 (then delete the kit.json it writes).
 
 Film strips stack frames top to bottom and stay under 16384 px tall.
@@ -26,7 +26,7 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import skin_layout as L  # noqa: E402
 
-OUT = os.path.join(L.ROOT, 'plugin', 'skins')
+OUT = L.SKINS
 
 
 class Canvas:
@@ -120,17 +120,6 @@ def spec_bar():
     c.save('spec_bar.png')
 
 
-def dot():
-    w, h, n = L.COL_W, L.GRAPH[3], L.DOT_FRAMES
-    c = Canvas(w, h * n)
-    gy = L.GRAPH[1]
-    for k in range(n):
-        db = -L.DRAW_RANGE_DB + k * (2 * L.DRAW_RANGE_DB / (n - 1))
-        cy = L.db_y(db) - gy
-        c.disc(w / 2, k * h + cy, 6.5, L.CURVE, 1.0, glow=9, glow_rgb=L.GLOW)
-    c.save('dot.png')
-
-
 def puck():
     c = Canvas(L.PUCK, L.PUCK)
     c.ring(L.PUCK / 2, L.PUCK / 2, 15, 3, L.CURVE, 0.9)
@@ -154,7 +143,6 @@ def main():
     background()
     background('bg_para.png')   # PARA: the same graph
     spec_bar()
-    dot()
     puck()
     draw_dot()
 

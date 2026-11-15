@@ -1,46 +1,74 @@
 # EQ Artist
 
-An EQ for the Akai MPC standalone (MPC OS 3.10.1+, insert effect) that you draw:
+An 8-band EQ for the Akai MPC standalone (MPC OS 3.10.1+, insert effect) that you edit two ways, over a
+live spectrum of the track:
 
-1. Drag your finger across the graph, over a live spectrum of the track. The sound follows your finger at
-   once (a 32-band live EQ solved straight from the drawing), and when you stop, the drawing has been fitted
-   to up to 8 real parametric bands (bell, shelf, cut, notch, tilt),
-   using zero-latency filters that follow their analog shapes, so high bands keep their width instead of
-   narrowing towards 20 kHz.
-2. **UNDO** takes back a stroke; **CLEAR** goes back to flat.
-3. Fine-tune each band's Freq and Gain with the Q-Links; the drawing follows.
+- **PARA:** drag band nodes on the graph. Each band has its own colour. Dragging sets frequency and gain (a cut's
+  resonance, a notch's depth); TYPE, Q and GAIN / SLOPE act on the selected band; − and + remove and add bands.
+- **DRAW:** paint the curve you want with a finger. The sound follows the finger at once, and the drawing is
+  fitted to the same bands.
 
-**Status: 0.4.1.** Tested in the desktop simulator, and the drawing surface on an MPC Live III.
-Controls: [docs/CONTROLS.md](docs/CONTROLS.md). How the drawing surface was chosen (the pen won):
-[docs/SPIKE.md](docs/SPIKE.md).
+Both pages edit one EQ: what you make on one shows on the other. The filters have zero latency and follow
+their analog shapes, so high bands keep their width instead of narrowing towards 20 kHz. Every setting works with
+the MPC's data wheel: touch it, and a ring shows which one the wheel edits.
+
+![The PARA page of EQ Artist Dots on an MPC Live III, with four bands](docs/images/para-page.png)
+
+It is built as two plugins from one codebase, with the same features:
+
+| Plugin | Curves | Status |
+|---|---|---|
+| **EQ Artist Dots** | drawn as dots (the fewest screen widgets) | the one to use |
+| **EQ Artist Lines** | drawn as connected lines | **experimental**: the screen updates far more slowly |
+
+**Status: 1.0.0.** Tested on an MPC Live III (MPC OS 3.10.1). Controls: [docs/CONTROLS.md](docs/CONTROLS.md).
+How the PARA page and the curve drawing were arrived at: [docs/PARA_STUDY.md](docs/PARA_STUDY.md) and
+[CurveUITest/test-results/live3.md](CurveUITest/test-results/live3.md).
+
+## Install
+
+1. Download **eq-artist-dots-1.0.0-mpc.zip** (and, to try it, **eq-artist-lines-1.0.0-mpc.zip**) from the release
+   and unzip it.
+2. Copy the folder `Slow Ops - VST - EQ Artist Dots` (or `... Lines`) into a folder named `VST2 Plugins` at the top
+   level of a USB drive, an SD card or the MPC's internal drive.
+3. On the MPC (MPC OS 3.10.1 or later), open **Preferences → Enhancements (Beta)** and switch on
+   **Enable Enhancements** and **External Plugin Support**.
+4. Restart the MPC, then add **EQ Artist Dots** (Slow Ops, under External Plugins) as an insert on a track.
+
+Parameter ids are permanent from 1.0, so projects saved with 1.0 keep working with later versions. Projects
+saved with a 0.x build may not load their settings. A project saved with one plugin does not load into the other.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `core/include/slowops/eqartist/` | Header-only DSP, standard library only (no plugin SDK): `Filters` (band shapes, analog-matched zero-latency biquads), `EqEngine` (8 bands, glides, click-free crossfades), `CurveFit` (drawing → bands), `LiveEq` (32 bells that follow the drawing instantly while you draw), `FitWorker` (runs the fit off the audio thread), `Spectrum` + `Fft` (analyser). |
-| `plugin/` | MPC Plugin Builder SDK project: `plugin.json`, `skins/`, and `src/EqArtist.cpp` (the adapter). |
-| `scripts/` | `build.sh`, `test.sh`, `gen_skins.py` (TUI.json + Q-Links.json), `make_skin_art.py` (PNGs without text, standard library only), `make_text_art.py` (button labels and graph labels, needs Pillow), `skin_layout.py` (shared layout and palette). |
-| `assets/fonts/` | Titillium Web Bold (SIL OFL 1.1, see `OFL.txt`), drawn into the skin images by `make_text_art.py`. `plugin/skins/knob_uni.png` is the SDK's UI-kit knob (MIT), rendered in purple. |
-| `tests/core_tests.cpp` | DSP unit tests: filters against their analog shapes, cut slopes, engine stability, curve fitting, analyser. |
-| `tests/scenario_host.cpp` | Loads the real plugin binary through the VST2 ABI, draws with the pen and measures that the audio follows the drawing; also Undo, Clear, Bypass, knob edits, clicks and the displays. Writes `plugin/build/draw-demo.wav`. |
-| `docs/CONTROLS.md` | Every control, the Q-Link map and the parameter list. |
-| `docs/SPIKE.md` | The Phase 0 drawing-surface test and its result. |
+| `core/include/slowops/eqartist/` | Header-only DSP and curve encoding, standard library only: `Filters` (band shapes, analog-matched zero-latency biquads), `EqEngine` (8 bands, glides, click-free crossfades), `CurveFit` (drawing → bands), `FitWorker` (runs the fit off the audio thread), `LiveEq` (32 bells that follow the drawing while you draw), `Spectrum` + `Fft` (analyser), `LineStrip` (curves as film-strip columns, node hit-testing). |
+| `plugin-common/` | The plugin, shared by both builds: `EqArtistPlugin.hpp` (parameters, DRAW, the display queue; takes a variant) and `ParaPage.hpp` (the PARA page). |
+| `plugins/dots/`, `plugins/lines/` | The two SDK projects: `plugin.json`, a few-line `src/*.cpp` that picks the variant, and `skins/`. |
+| `scripts/` | `build.sh`, `test.sh` (both plugins); `gen_skins.py` (TUI.json + Q-Links.json), `make_art.sh` and the art scripts (PNGs; text needs Pillow), `skin_layout.py` (shared layout and palette). The plugin to work on is chosen with `EQA_VARIANT=dots|lines`. |
+| `tests/` | `core_tests.cpp` (DSP and curve encoding), `scenario_host.cpp` (drives each real plugin binary through the VST2 ABI: PARA edits and DRAW strokes against the measured audio). |
+| `CurveUITest/` | A separate diagnostic plugin and its hardware results: what the MPC's skin widgets can and cannot do. |
+| `docs/` | `CONTROLS.md`, `PARA_STUDY.md` (how the PARA page and the curve drawing were arrived at), `SPIKE.md` (the first drawing-surface test). |
+| `assets/fonts/` | Titillium Web Bold (SIL OFL 1.1, see `OFL.txt`), drawn into the skin images. `knob_uni.png` in the skins is the SDK's UI-kit knob (MIT), rendered in purple. |
 | `third_party/mpc-plugin-builder-sdk` | Official SDK as a git submodule, pinned to `febd2ca` (2026-11-07). |
 
 ## Build and test
 
 ```sh
 git submodule update --init
-./scripts/test.sh        # build (native + arm32 + arm64), core tests, host_sim, scenario host
+./scripts/test.sh        # both plugins: build (native + arm32 + arm64), core tests, host_sim, scenario host
 ```
 
-On the first run, `build.py` installs Zig into `third_party/mpc-plugin-builder-sdk/.sdk-tools/` (about 50 MB).
-The output folder is `plugin/build/Slow Ops - VST - EQ Artist/`. Copy the whole folder into
-`VST2 Plugins/` at the root of a drive the MPC can see.
+`scripts/package.sh` zips both built plugins into `dist/`.
 
-The skin images are committed. After changing `scripts/skin_layout.py`, run `python3 scripts/make_skin_art.py`, then
-`scripts/make_text_art.py` with a Python that has Pillow (it adds the text to the images).
+On the first run, `build.py` installs Zig into `third_party/mpc-plugin-builder-sdk/.sdk-tools/` (about 50 MB).
+The output folders are `plugins/dots/build/Slow Ops - VST - EQ Artist Dots/` and
+`plugins/lines/build/Slow Ops - VST - EQ Artist Lines/`. Copy a folder into `VST2 Plugins/` at the root of a
+drive the MPC can see, or install over the network with the SDK's `tools/mpc_remote.py`. The MPC needs
+Preferences → Enhancements (Beta) → Enable Enhancements and External Plugin Support.
+
+The skin images are committed. After changing `scripts/skin_layout.py`, run
+`PILLOW_PY=/path/to/python-with-pillow scripts/make_art.sh`.
 
 ## Licence
 

@@ -39,7 +39,17 @@ inline constexpr int kMaxSections = 4;
 
 inline bool typeHasGain(BandType t)
 {
-    return t == BandType::Bell || t == BandType::LowShelf || t == BandType::HighShelf || t == BandType::TiltShelf;
+    return t == BandType::Bell || t == BandType::LowShelf || t == BandType::HighShelf || t == BandType::TiltShelf ||
+           t == BandType::Notch;
+}
+
+// A notch's gain is its depth: 0 dB is no cut, and at kNotchFullDb or below the notch is complete (infinitely deep).
+// Gain above 0 dB is no cut.
+inline constexpr double kNotchFullDb = -18.0;
+inline bool notchIsFull(double gainDb) { return gainDb <= kNotchFullDb + 0.05; }
+inline double notchDepthLinear(double gainDb)
+{
+    return notchIsFull(gainDb) ? 0.0 : std::pow(10.0, std::min(gainDb, 0.0) / 20.0);
 }
 inline bool typeHasSlope(BandType t) { return t == BandType::LowCut || t == BandType::HighCut; }
 
@@ -122,8 +132,8 @@ inline AnalogBand analogBand(const BandParams& p)
             add({a * lift, a * r * lift, a * a * lift, a, r, 1, Match::Shelf});
             break;
         }
-        case BandType::Notch:
-            add({1, 0, 1, 1, 1 / q, 1, Match::Peak});
+        case BandType::Notch:   // at f0 the level is the depth (0 for a full notch)
+            add({1, notchDepthLinear(p.gainDb) / q, 1, 1, 1 / q, 1, Match::Peak});
             break;
         case BandType::BandPass:
             add({0, 1 / q, 0, 1, 1 / q, 1, Match::BandPass});

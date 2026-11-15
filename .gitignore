@@ -70,3 +70,6 @@ Testing/
 # Python
 __pycache__/
 *.pyc
+
+# Release zips (scripts/package.sh)
+dist/

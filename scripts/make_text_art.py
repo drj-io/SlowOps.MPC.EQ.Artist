@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw everything with text into plugin/skins/ (needs Pillow): the labelled buttons and switch
+"""Draw everything with text into plugins/<EQA_VARIANT>/skins/ (needs Pillow): the labelled buttons and switch
 segments, and the graph's frequency / dB labels and the bottom-row captions onto bg.png.
 
 On the MPC, fixed-text Label widgets do not show, and text cannot sit over an image button, so
@@ -18,17 +18,17 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import skin_layout as L  # noqa: E402
 
-OUT = os.path.join(L.ROOT, 'plugin', 'skins')
+OUT = L.SKINS
 FONT = os.path.join(L.ROOT, 'assets', 'fonts', 'TitilliumWeb-Bold.ttf')
 SS = 4   # supersampling
 
 
-def face(label, fill, fill_a, edge, text, w=L.BUTTON_W, h=L.BUTTON_H):
+def face(label, fill, fill_a, edge, text, w=L.BUTTON_W, h=L.BUTTON_H, size=21):
     img = Image.new('RGBA', (w * SS, h * SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((SS, SS, w * SS - SS, h * SS - SS), radius=8 * SS,
                         fill=fill + (int(255 * fill_a),), outline=edge + (255,), width=2 * SS)
-    font = ImageFont.truetype(FONT, 21 * SS)
+    font = ImageFont.truetype(FONT, size * SS)
     box = d.textbbox((0, 0), label, font=font)
     tw, th = box[2] - box[0], box[3] - box[1]
     d.text(((w * SS - tw) / 2 - box[0], (h * SS - th) / 2 - box[1]), label, font=font, fill=text + (255,))

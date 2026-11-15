@@ -494,6 +494,24 @@ static void testLineStrip()
     CHECK(eq::hitTest(nx, ny, all, 3, 0.45, 0.1, 1216, 408, 44) == -1, "a far touch picked a node");
 }
 
+// A notch's gain is its depth: the analog shape and the filter reach it at f0; -18 dB or below is a full notch.
+static void testNotchDepth()
+{
+    std::printf("== notch depth\n");
+    for (double sr : {44100.0, 48000.0})
+        for (double f0 : {100.0, 1000.0, 8000.0})
+            for (double depth : {-3.0, -6.0, -12.0, -17.0})
+            {
+                const auto p = band(eq::BandType::Notch, f0, depth, 4.0);
+                const double a = eq::analogDb(p, f0), dd = eq::digitalDb(eq::design(p, sr), f0, sr);
+                CHECK(std::fabs(a - depth) < 0.01 && std::fabs(dd - depth) < 0.3, "notch %.0f Hz %.0f dB: analog %.2f, filter %.2f", f0, depth, a, dd);
+            }
+    const auto full = band(eq::BandType::Notch, 1000.0, -18.0, 4.0);
+    CHECK(eq::digitalDb(eq::design(full, 48000.0), 1000.0, 48000.0) < -60.0, "a -18 dB notch is not full");
+    const auto none = band(eq::BandType::Notch, 1000.0, 6.0, 4.0);
+    CHECK(std::fabs(eq::digitalDb(eq::design(none, 48000.0), 1000.0, 48000.0)) < 0.05, "a notch above 0 dB still cuts");
+}
+
 int main()
 {
     testFft();
@@ -502,6 +520,7 @@ int main()
     testSpectrumRelease();
     testFiltersMatchAnalog();
     testCutSlopes();
+    testNotchDepth();
     testEngine();
     testFitKnownCurves();
     testFitDrawnShapes();

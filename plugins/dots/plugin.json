@@ -1,0 +1,16 @@
+{
+  "name": "EQ Artist Dots",
+  "manufacturer": "Slow Ops",
+  "version": "1.0.0",
+  "format": "vst2",
+  "kind": "effect",
+  "uid": "SoED",
+  "numInputs": 2,
+  "numOutputs": 2,
+  "category": "Effect",
+  "file32": "VST/eqartist-dots-arm32.so",
+  "file64": "VST/eqartist-dots-arm64.so",
+  "description": "An 8-band EQ you edit by dragging band nodes (PARA) or by drawing the curve (DRAW), over a live spectrum. Curves are drawn as dots: the fewest screen widgets, for speed.",
+  "author": "Slow Ops",
+  "license": "MIT"
+}
