@@ -45,7 +45,7 @@ saved with a 0.x build may not load their settings. A project saved with one plu
 | `core/include/slowops/eqartist/` | Header-only DSP and curve encoding, standard library only: `Filters` (band shapes, analog-matched zero-latency biquads), `EqEngine` (8 bands, glides, click-free crossfades), `CurveFit` (drawing → bands), `FitWorker` (runs the fit off the audio thread), `LiveEq` (32 bells that follow the drawing while you draw), `Spectrum` + `Fft` (analyser), `LineStrip` (curves as film-strip columns, node hit-testing). |
 | `plugin-common/` | The plugin, shared by both builds: `EqArtistPlugin.hpp` (parameters, DRAW, the display queue; takes a variant) and `ParaPage.hpp` (the PARA page). |
 | `plugins/dots/`, `plugins/lines/` | The two SDK projects: `plugin.json`, a few-line `src/*.cpp` that picks the variant, and `skins/`. |
-| `scripts/` | `build.sh`, `test.sh` (both plugins); `gen_skins.py` (TUI.json + Q-Links.json), `make_art.sh` and the art scripts (PNGs; text needs Pillow), `skin_layout.py` (shared layout and palette). The plugin to work on is chosen with `EQA_VARIANT=dots|lines`. |
+| `scripts/` | `build.sh`, `test.sh` (both plugins); `package.sh` (release zips), `release.sh` (catalog zips); `gen_skins.py` (TUI.json + Q-Links.json), `make_art.sh` and the art scripts (PNGs; text needs Pillow), `skin_layout.py` (shared layout and palette). The plugin to work on is chosen with `EQA_VARIANT=dots|lines`. |
 | `tests/` | `core_tests.cpp` (DSP and curve encoding), `scenario_host.cpp` (drives each real plugin binary through the VST2 ABI: PARA edits and DRAW strokes against the measured audio). |
 | `CurveUITest/` | A separate diagnostic plugin and its hardware results: what the MPC's skin widgets can and cannot do. |
 | `docs/` | `CONTROLS.md`, `PARA_STUDY.md` (how the PARA page and the curve drawing were arrived at), `SPIKE.md` (the first drawing-surface test). |
@@ -59,7 +59,10 @@ git submodule update --init
 ./scripts/test.sh        # both plugins: build (native + arm32 + arm64), core tests, host_sim, scenario host
 ```
 
-`scripts/package.sh` zips both built plugins into `dist/`.
+`scripts/package.sh` zips both built plugins into `dist/`. `scripts/release.sh` then makes the
+[open-mpc catalog](https://open-mpc.github.io/workflow.html) zips for EQ Artist Dots
+(`EQ-Artist-Dots-<version>-mpc-armv7.zip` and `-mpc-aarch64.zip`) with the catalog's own tools, from a checkout of
+`open-mpc/mpc-vst-plugins` beside this repo (or `MPC_CATALOG`), and checks them. Attach those zips to the GitHub release too.
 
 On the first run, `build.py` installs Zig into `third_party/mpc-plugin-builder-sdk/.sdk-tools/` (about 50 MB).
 The output folders are `plugins/dots/build/Slow Ops - VST - EQ Artist Dots/` and
