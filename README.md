@@ -60,8 +60,8 @@ git submodule update --init
 ```
 
 `scripts/package.sh` zips both built plugins into `dist/`. `scripts/release.sh` then makes the
-[open-mpc catalog](https://open-mpc.github.io/workflow.html) zips for EQ Artist Dots
-(`EQ-Artist-Dots-<version>-mpc-armv7.zip` and `-mpc-aarch64.zip`) with the catalog's own tools, from a checkout of
+[open-mpc catalog](https://open-mpc.github.io/workflow.html) zips, where EQ Artist Dots is listed as "EQ Artist"
+(`EQ-Artist-<version>-mpc-armv7.zip` and `-mpc-aarch64.zip`) with the catalog's own tools, from a checkout of
 `open-mpc/mpc-vst-plugins` beside this repo (or `MPC_CATALOG`), and checks them. Attach those zips to the GitHub release too.
 
 On the first run, `build.py` installs Zig into `third_party/mpc-plugin-builder-sdk/.sdk-tools/` (about 50 MB).
